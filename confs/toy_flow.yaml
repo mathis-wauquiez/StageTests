@@ -1,0 +1,40 @@
+flow_model:
+  _target_: src.flows.flow.Flow
+
+  loss_fn:
+    _target_: src.flows.losses.MSEFlowMatchingLoss
+
+  model:
+    _target_: src.experiments.models.models.TimeConditionedMLP
+    x_dim: 2
+    output_dim: 2
+    num_fourier_bands: 4
+    hidden_dim: 64
+    n_layers: 4
+
+  predicts: "x_1" # or "x_0", "score"
+  guidance: null  # or "classifier", even though it does not work yet
+  classifier: null  # only if guidance == "classifier"
+
+
+  path:
+    _target_: src.flows.path.AffinePath 
+
+    scheduler:
+      _target_: src.flows.schedulers.OTScheduler  # or CosineScheduler
+
+    t_law:
+      _target_: torch.distributions.uniform.Uniform
+      low: 0.0
+      high: 1.0
+
+
+  optimizer_cfg:
+    _target_: torch.optim.Adam
+    _partial_: true     # ← important!
+    lr: 0.0005
+    weight_decay: 0.0
+    betas:
+      - 0.9
+      - 0.999
+    eps: 1e-08

@@ -2,12 +2,14 @@ from abc import ABC, abstractmethod
 from typing import Literal, Optional
 
 from torch import nn, Tensor
-
+import torch
 
 from .schedulers import Scheduler
 from .models import ModelWrapper
 from torch.distributions import Distribution
 from torch.distributions.uniform import Uniform
+
+import numpy as np
 
 
 
@@ -24,11 +26,20 @@ class AffinePath(nn.Module):
         model (ModelWrapper): A wrapper around the model used to predict intermediate quantities (e.g., score, x0).
         predicts (Literal["x_0", "x_1", "score"]): Type of prediction made by the model.
         guidance (Optional[Literal["CFG", "classifier"]], optional): Type of conditional guidance to apply.
+        guidance_scale (float, optional): Scale for the guidance. Defaults to 1.0.
         t_law (Optional[Distribution], optional): A PyTorch distribution to sample random time values from. Defaults to Uniform(0, 1).
         classifier (Optional[nn.Module], optional): A classifier network used if `guidance="classifier"` is specified.
 
     Raises:
         ValueError: If classifier guidance is selected without providing a classifier.
+
+    Arguments in the methods:
+        x_0: Tensor (bs, ...), the initial state
+        x_1: Tensor (bs, ...), the final state
+        t: Tensor (bs, ...), the time step.
+        f_A: The value to convert (score, x_0, x_1, or velocity)
+        source_parameterization: The parameterization of the value to convert. Either x_0, x_1, score or velocity
+        target_parameterization: The parameterization to convert to. Either x_0, x_1, score or velocity
 
     Methods:
         sample(x_0, x_1, t=None):
@@ -40,36 +51,31 @@ class AffinePath(nn.Module):
         convert_parameterization(x_t, t, f_A, source_parameterization, target_parameterization):
             Converts a model prediction from one parameterization to another.
 
-    Example:
+    Example usage:
+        >>> model = ...  # Your model here. Should take (t, x) as input and output a tensor representing either x_0, x_1, or score.
+        >>> scheduler = OTScheduler()
         >>> path = AffinePath(scheduler, model, predicts="score")
-        >>> x_t, t = path.sample(x_0, x_1)
-        >>> v_t = path.estimated_velocity(x_t, t=t)
-        >>> x_0_estimated = path.convert_parameterization(x_t, t, v_t, "v", "x_0")
-        """
+        >>> t, x_t = path.sample(x_0, x_1) # samples t~p_t(t) and x_t~p_t(x_t|x_0,x_1)
+        >>> v_t = path.estimated_velocity(x_t, t=t) # u^\theta(t, x_t)
+        >>> x_0_estimated = path.convert_parameterization(t, x_t, v_t, "v", "x_0")
+        
+    The convention is to always use the order (t, x_t) when calling methods.
+    """
             
     def __init__(
             self,
             scheduler: Scheduler,
-            model: ModelWrapper,
-            predicts: Literal["x_0", "x_1", "score"],
-            guidance: Optional[Literal["CFG", "classifier"]] = None,
             t_law: Optional[Distribution] = Uniform(low=0.0, high=1.0),
-            classifier: Optional[nn.Module] = None,
     ):
-        
-        assert predicts in ["x_0", "x_1", "score"]
-        assert guidance in [None, "CFG", "classifier"]
-
-        if guidance == "classifier" and classifier is None:
-            raise ValueError("If classifier guidance is used, a classifier must be provided")
+        super().__init__()
 
         self.scheduler = scheduler
-        self.model = model
-        
-        self.predicts = predicts
-        self.guidance = guidance
         self.t_law = t_law
 
+        # Ensure the t_law is a valid distribution
+        if not hasattr(t_law, "sample"):
+            raise ValueError("t_law must be a valid distribution with a sample method")
+        
     def sample(self, x_0, x_1, t=None):
         """
         Sample from the conditional path.
@@ -77,42 +83,30 @@ class AffinePath(nn.Module):
         Args:
             x_0: Tensor (bs, ...), the initial state
             x_1: Tensor (bs, ...), the final state
-            t: Optional[Scalar], the time step to sample at. If None, sample from the t_law.
+            t: Optional[Tensor], the time steps to sample at. If None, sample from the t_law.
         """
         if t is None:
-            t = self.t_law.sample()
+            t = self.t_law.sample((x_0.shape[0],)).to(x_0.device)
 
-        if t.dim() > 0:
-            raise ValueError("t must be a scalar")
+
+        if t.dim() != 1:
+            raise ValueError("t must be a 1D tensor")
         
         if x_0.shape != x_1.shape:
             raise ValueError("x_0 and x_1 must be the same shape")
     
         x_t = self.scheduler.sample(x_0, x_1, t)
 
-        return x_t, t
+        return t, x_t
     
 
-    def estimated_velocity(self, x, t, **kwargs):
-        """
-        Estimate the velocity at time t.
-
-        Args:
-            x: Tensor (bs, ...), the state at time t
-            t: Scalar, the time step to estimate at.
-            **kwargs: Additional arguments to pass to the model
-        """
-        
-        outputs = self.model(x, t, **kwargs)
-        velocity = self.convert_parameterization(x, t, outputs, self.predicts, "v")
-        return velocity
-
-    def convert_parameterization(self, x_t, t, f_A, source_parameterization, target_parameterization):
+    def convert_parameterization(self, t, x_t, f_A, source_parameterization, target_parameterization):
         """
         Convert one type of parameterization to another.
         Can be used to convert between x_0, x_1, score and velocity, according to the table 1 in the Meta paper.
 
         Args:
+            t: The time step.
             x_t: The value of the path at time t
             f_A: The value to convert
             source_parameterization: The parameterization of the value to convert. Either x_0, x_1, score or velocity
@@ -123,7 +117,14 @@ class AffinePath(nn.Module):
         assert target_parameterization in ["v", "x_0", "x_1", "score", "velocity"], f"{target_parameterization} is not a valid parameterization"
         assert x_t.shape == f_A.shape, f"x_t and f_A must be the same shape, got {x_t.shape} and {f_A.shape}"
 
+        # Coefficients are of shape (bs, )
         a, b = self._get_parameterization_conversion_coefficients(source_parameterization, target_parameterization, t)
+
+        # Ensure proper shape for broadcasting
+        while a.ndim < x_t.ndim:
+            a = a.unsqueeze(-1)
+        while b.ndim < x_t.ndim:
+            b = b.unsqueeze(-1)
 
         return a * x_t + b * f_A
     
@@ -147,18 +148,39 @@ class AffinePath(nn.Module):
         assert origin in ["v", "x_0", "x_1", "score"]
         assert target in ["v", "x_0", "x_1", "score"]
 
+        a = torch.zeros_like(t)
+        b = torch.zeros_like(t)
+
+        # Get the alpha and sigma values at time t
         alpha = self.scheduler.alpha(t)
         alpha_dt = self.scheduler.alpha_dt(t)
 
         sigma = self.scheduler.sigma(t)
         sigma_dt = self.scheduler.sigma_dt(t)
 
-        coefficients = {
+        # We manage the singularities when alpha = 0 or sigma = 0 (i.e. t = 0 or t = 1)
+        t_0_mask = torch.isclose(t, torch.zeros_like(t), atol=1e-3)
+        t_1_mask = torch.isclose(t, torch.ones_like(t), atol=1e-3)
+
+        # When t=0 or t=1, we can only convert to the velocity parameterization
+        # In this case, b=0 and a=sigma_dt or a=alpha_dt
+        if t_0_mask.any():
+            assert target == "v" or target==origin, f"Cannot convert to {target} when t=0"
+            a[t_0_mask] = sigma_dt[t_0_mask]
+            b[t_0_mask] = 0.0
+
+        if t_1_mask.any():
+            assert target == "v" or target==origin, f"Cannot convert to {target} when t=1"
+            a[t_1_mask] = alpha_dt[t_1_mask]
+            b[t_1_mask] = 0.0
+
+        # Coefficients for the conversion
+        target_origin_coefficients = {
             "v": {                  # target
                 "v": (0.0, 1.0),    # origin
-                "x_0": (sigma_dt/sigma, (alpha_dt*sigma-sigma_dt*alpha)/sigma),
-                "x_1": (alpha_dt/alpha, (sigma_dt*alpha-alpha_dt*sigma)/alpha),
-                "score": (alpha_dt/alpha, -(sigma_dt*sigma*alpha-alpha_dt*sigma**2)/alpha),
+                "x_1": (sigma_dt/sigma, (alpha_dt*sigma-sigma_dt*alpha)/sigma),
+                "x_0": (alpha_dt/alpha, (sigma_dt*alpha-alpha_dt*sigma)/alpha),
+                "score": (alpha_dt/alpha, -sigma * (sigma_dt*alpha-alpha_dt*sigma)/alpha),
             },
             "x_1": {
                 "x_1": (0.0, 1.0),
@@ -174,12 +196,15 @@ class AffinePath(nn.Module):
             }
         }
 
-        if origin not in coefficients[target]:
-            a, b = coefficients[origin][target]
-            a, b = -a/b, 1/b
-        
-        else:
-            a, b = coefficients[origin][target]
+        mask = torch.logical_not(t_0_mask) & torch.logical_not(t_1_mask)
 
+        if origin in target_origin_coefficients[target]:
+            a_, b_ = target_origin_coefficients[target][origin]
+        else:
+            a_, b_ = target_origin_coefficients[origin][target]
+            a_, b_ = -a_/b_, 1/b_
+
+        a[mask], b[mask] = a_[mask], b_[mask]
+    
         return a, b
 

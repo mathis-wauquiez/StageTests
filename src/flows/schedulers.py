@@ -16,7 +16,7 @@ class Scheduler(ABC, nn.Module):
     @abstractmethod
     def alpha(self, t) -> Tensor:
         """
-        Returns the alpha value for the current timestep.
+        Returns the alpha value for the timesteps.
         """
         pass
 
@@ -24,7 +24,7 @@ class Scheduler(ABC, nn.Module):
     @abstractmethod
     def alpha_dt(self, t) -> Tensor:
         """
-        Returns the time derivative of alpha for the current timestep.
+        Returns the time derivative of alpha for the timesteps.
         """
         pass
 
@@ -32,7 +32,7 @@ class Scheduler(ABC, nn.Module):
     @abstractmethod
     def sigma(self, t) -> Tensor:
         """
-        Returns the sigma value for the current timestep.
+        Returns the sigma value for the timesteps.
         """
         pass
 
@@ -40,16 +40,20 @@ class Scheduler(ABC, nn.Module):
     @abstractmethod
     def sigma_dt(self, t) -> Tensor:
         """
-        Returns the time derivative of sigma for the current timestep.
+        Returns the time derivative of sigma for the timesteps.
         """
         pass
 
 
     def snr(self, t) -> Tensor:
         """
-        Returns the signal-to-noise ratio for the current timestep.
+        Returns the signal-to-noise ratio for the timesteps.
         """
-        return self.alpha(t) / self.sigma(t)
+        sigma = self.sigma(t)
+
+        snr = self.alpha(t) / sigma
+        snr[sigma == 0] = float("inf")
+        return snr
     
     def sample(self, x_0: Tensor, x_1: Tensor, t: Tensor) -> Tensor:
         """
@@ -57,11 +61,12 @@ class Scheduler(ABC, nn.Module):
         Args:
             x_0: Tensor (bs, ...), the initial state
             x_1: Tensor (bs, ...), the final state
-            t: Scalar Tensor or (bs,) Tensor, the time step(s) to sample at.
+            t: Tensor (bs,), the time steps
         
         Returns:
             x_t: Tensor (bs, ...), the state at time t, equal to alpha(t) * x_1 + sigma(t) * x_0
         """
+        t = t.to(x_0.device)
         alpha_t = self.alpha(t)
         sigma_t = self.sigma(t)
 
