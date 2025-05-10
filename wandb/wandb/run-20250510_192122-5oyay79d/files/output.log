@@ -1,0 +1,22 @@
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name  | Type               | Params | Mode
+-----------------------------------------------------
+0 | model | TimeConditionedMLP | 13.3 K | train
+1 | path  | AffinePath         | 0      | train
+-----------------------------------------------------
+13.3 K    Trainable params
+0         Non-trainable params
+13.3 K    Total params
+0.053     Total estimated model params size (MB)
+13        Modules in train mode
+0         Modules in eval mode
+/home/mathis/anaconda3/lib/python3.12/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:425: The 'train_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=7` in the `DataLoader` to improve performance.
+INFO:experiments.callback.progress:Training started
+INFO:experiments.callback.progress:Epoch 0: loss 5.017e-01
+INFO:experiments.callback.progress:Epoch 1: loss 4.829e-01
+INFO:experiments.callback.progress:Epoch 2: loss 4.793e-01
+`Trainer.fit` stopped: `max_epochs=3` reached.
+INFO:experiments.callback.progress:Training done
+INFO:matplotlib.animation:Animation.save using <class 'matplotlib.animation.HTMLWriter'>
+INFO:matplotlib.animation:Animation.save using <class 'matplotlib.animation.HTMLWriter'>

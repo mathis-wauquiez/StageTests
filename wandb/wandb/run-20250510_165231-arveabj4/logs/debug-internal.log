@@ -1,0 +1,104 @@
+{"time":"2025-05-10T16:52:31.420095939+02:00","level":"INFO","msg":"stream: starting","core version":"0.19.11","symlink path":"wandb/wandb/run-20250510_165231-arveabj4/logs/debug-core.log"}
+{"time":"2025-05-10T16:52:31.888721874+02:00","level":"INFO","msg":"created new stream","id":"arveabj4"}
+{"time":"2025-05-10T16:52:31.888761692+02:00","level":"INFO","msg":"stream: started","id":"arveabj4"}
+{"time":"2025-05-10T16:52:31.888779277+02:00","level":"INFO","msg":"writer: Do: started","stream_id":"arveabj4"}
+{"time":"2025-05-10T16:52:31.888894142+02:00","level":"INFO","msg":"handler: started","stream_id":"arveabj4"}
+{"time":"2025-05-10T16:52:31.888907907+02:00","level":"INFO","msg":"sender: started","stream_id":"arveabj4"}
+{"time":"2025-05-10T16:52:32.510636382+02:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-05-10T16:55:52.461990448+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:55:52.466083151+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:55:52.471110929+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:55:52.475031323+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:55:52.481354448+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:55:52.484636314+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:55:52.491637327+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:55:52.495573007+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:55:52.501866884+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:55:52.50539685+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:55:52.512225175+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:55:52.941965258+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:55:52.956192853+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:56:01.731864089+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:56:02.151739907+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:56:02.307849761+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:56:02.322698905+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:56:08.864566496+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:56:09.008224454+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:56:12.391351472+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:56:12.406261175+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:56:12.688196601+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:19.039826193+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:19.042884502+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:20.274472888+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:20.28717252+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:20.890512568+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:20.895397119+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:22.560921863+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:22.572004699+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:22.644581481+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:22.647264765+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:23.159793176+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:23.166335964+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:27.552554696+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:36.765421825+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:58:58.941842874+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:58:58.982371927+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T16:59:00.566690724+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T16:59:09.30014977+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:18:35.180892088+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:18:35.221372406+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:18:35.413049722+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:18:35.416211083+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:18:51.405768911+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:18:51.409243027+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:18:52.146797027+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:18:52.150200925+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:18:52.313290303+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:18:52.317712342+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:18:52.494185928+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:18:52.497754418+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:18:52.616223604+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:18:52.619547195+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:16.62225573+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:16.662405122+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:16.791221944+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:16.805451978+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:29.807884273+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:29.848459973+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:31.825616914+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:31.828131532+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:32.808289891+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:32.811808233+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:34.768163401+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:34.807385385+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:35.949978754+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:35.952174051+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:38.67409222+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:38.67778877+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:39.902944778+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:39.905439496+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:40.569279813+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:40.571980124+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:44.692710254+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:44.733359141+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T17:20:45.597861363+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T17:20:45.601101691+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T18:19:18.299137467+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:19:50.770161458+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-05-10T18:20:25.42607351+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:21:03.729022493+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-05-10T18:21:52.79957618+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:23:01.48544704+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:24:31.486934441+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:26:01.487883078+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:27:31.490199202+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:28:48.298995518+02:00","level":"WARN","msg":"sender: taking a long time","seconds":600.000807323,"work":"WorkRecord(*service_go_proto.Request_StopStatus); Control(local:true mailbox_slot:\"wnkuub915psl\" connection_id:\"127.0.0.1:45690\")"}
+{"time":"2025-05-10T18:29:01.492393973+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-05-10T18:30:31.494347978+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-05-10T18:32:01.496321614+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-05-10T18:33:31.49746652+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-05-10T18:35:01.499549641+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded"}
+{"time":"2025-05-10T18:36:01.900090336+02:00","level":"INFO","msg":"sender: succeeded after taking longer than expected","seconds":1033.601817865,"work":"WorkRecord(*service_go_proto.Request_StopStatus); Control(local:true mailbox_slot:\"wnkuub915psl\" connection_id:\"127.0.0.1:45690\")"}
+{"time":"2025-05-10T19:33:01.90145327+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/mathis-wauquiez-cole-des-ponts-paristech/StageTests/arveabj4/file_stream\": net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-05-10T20:38:57.525322536+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/mathis-wauquiez-cole-des-ponts-paristech/StageTests/arveabj4/file_stream\": dial tcp: lookup api.wandb.ai on 127.0.0.53:53: read udp 127.0.0.1:55171->127.0.0.53:53: i/o timeout"}
+{"time":"2025-05-10T20:47:27.525348582+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/mathis-wauquiez-cole-des-ponts-paristech/StageTests/arveabj4/file_stream\": dial tcp: lookup api.wandb.ai on 127.0.0.53:53: read udp 127.0.0.1:37637->127.0.0.53:53: i/o timeout"}

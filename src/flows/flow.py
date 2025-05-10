@@ -125,7 +125,23 @@ class Flow(LightningModule):
         # Convert the output to the desired parameterization
         velocity = self.path.convert_parameterization(t, x, outputs, predicts, "v")
         return velocity
+    
 
+    def get_x0(self, t, x, **kwargs):
+        v = self.estimated_velocity(t, x, **kwargs)
+        return self.path.convert_parameterization(t, x, v, "v", "x_0")
+    
+    def get_x1(self, t, x, **kwargs):
+        v = self.estimated_velocity(t, x, **kwargs)
+        return self.path.convert_parameterization(t, x, v, "v", "x_1")
+    
+    def get_score(self, t, x, **kwargs):
+        v = self.estimated_velocity(t, x, **kwargs)
+        return self.path.convert_parameterization(t, x, v, "v", "score")
+    
+    def get_v(self, t, x, **kwargs):
+        v = self.estimated_velocity(t, x, **kwargs)
+        return v
 
     def target_velocity(self, t, x_0, x_1):
         """
@@ -158,7 +174,7 @@ class Flow(LightningModule):
 
 
 
-    def sample(self, x_0: torch.Tensor, n_steps: Optional[int]=50, **solver_cfg):
+    def sample_trajectory(self, x_0: torch.Tensor, n_steps: Optional[int]=50, **solver_cfg):
 
         t = torch.linspace(0, 1, n_steps, device=self.device)
 
@@ -180,44 +196,18 @@ class Flow(LightningModule):
                 **solver_cfg
             )
         
-        x_t = trajectory[-1]
-
-        return x_t
+        return trajectory, t
     
-    def sample_trajectory(self, x_0: torch.Tensor, **solver_cfg):
+    def sample(self, x_0: torch.Tensor, n_steps: Optional[int]=50, **solver_cfg):
         """
-        Sample a trajectory from the flow model.
-
+        Sample from the flow model.
+        
         Args:
             x_0: Tensor (bs, ...), the initial state
-            solver_params: dict, additional parameters for the ODE solver
-
-        Returns:
-            trajectory: Tensor (n_steps, bs, ...), the sampled trajectory
-            t: Tensor (n_steps,), the time steps
+            n_steps: int, the number of steps to sample
+            solver_cfg: dict, additional arguments for the solver
         """
-        t = torch.linspace(0, 1, self.n_steps, device=self.device)
-
-
-        if self.solver_cfg is not None:
-            solver_cfg = OmegaConf.to_container(self.solver_cfg).update(solver_cfg)
-
-        if "method" not in solver_cfg:
-            solver_cfg["method"] = "midpoint"
-
-        if self.guidance == "classifier":
-            if not "args" in solver_cfg or not "y" in solver_cfg["args"]:
-                raise ValueError("Classifier guidance requires 'y' in solver_cfg['args'] (odeint(func,y0,t,args=(123, 456)))")
-
-        with torch.no_grad():
-            trajectory = odeint(
-                self.path.estimated_velocity,
-                x_0,
-                t,
-                **solver_cfg
-            )
-
-        return trajectory, t
+        return self.sample_trajectory(x_0, n_steps, **solver_cfg)[0][-1]
     
     def _get_loss(self, x_0, x_1, t, x_t, **kwargs):
         """

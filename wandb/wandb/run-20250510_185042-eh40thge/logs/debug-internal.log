@@ -1,0 +1,13 @@
+{"time":"2025-05-10T18:50:42.059907904+02:00","level":"INFO","msg":"stream: starting","core version":"0.19.11","symlink path":"wandb/wandb/run-20250510_185042-eh40thge/logs/debug-core.log"}
+{"time":"2025-05-10T18:50:42.939169763+02:00","level":"INFO","msg":"created new stream","id":"eh40thge"}
+{"time":"2025-05-10T18:50:42.939367493+02:00","level":"INFO","msg":"stream: started","id":"eh40thge"}
+{"time":"2025-05-10T18:50:42.939485387+02:00","level":"INFO","msg":"sender: started","stream_id":"eh40thge"}
+{"time":"2025-05-10T18:50:42.939481757+02:00","level":"INFO","msg":"writer: Do: started","stream_id":"eh40thge"}
+{"time":"2025-05-10T18:50:42.939700273+02:00","level":"INFO","msg":"handler: started","stream_id":"eh40thge"}
+{"time":"2025-05-10T18:50:43.584625567+02:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-05-10T18:54:35.419074468+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T18:54:35.706749663+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T18:54:35.723871945+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T18:54:44.134962055+02:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-05-10T18:54:44.968915158+02:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-05-10T18:54:46.887698238+02:00","level":"INFO","msg":"Resuming system monitor"}

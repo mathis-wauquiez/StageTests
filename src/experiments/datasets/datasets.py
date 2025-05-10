@@ -182,7 +182,7 @@ def get_second_example_dataset(num_samples):
     import torch
 
     # Parameters
-    std0 = 1       # std of initial single Gaussian
+    std0 = 0.4       # std of initial single Gaussian
     std_target = 0.3 # std of each target GMM component
     radius = 2.0      # radius of the circular GMM
     num_components = 5

@@ -1,0 +1,286 @@
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name  | Type               | Params | Mode
+-----------------------------------------------------
+0 | model | TimeConditionedMLP | 13.3 K | train
+1 | path  | AffinePath         | 0      | train
+-----------------------------------------------------
+13.3 K    Trainable params
+0         Non-trainable params
+13.3 K    Total params
+0.053     Total estimated model params size (MB)
+13        Modules in train mode
+0         Modules in eval mode
+/home/mathis/anaconda3/lib/python3.12/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:425: The 'train_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=7` in the `DataLoader` to improve performance.
+INFO:experiments.callback.progress:Training started
+INFO:experiments.callback.progress:Epoch 0: loss 2.040e+00
+INFO:experiments.callback.progress:Epoch 1: loss 1.719e+00
+INFO:experiments.callback.progress:Epoch 2: loss 1.095e+00
+INFO:experiments.callback.progress:Epoch 3: loss 9.271e-01
+INFO:experiments.callback.progress:Epoch 4: loss 8.927e-01
+INFO:experiments.callback.progress:Epoch 5: loss 8.705e-01
+INFO:experiments.callback.progress:Epoch 6: loss 8.596e-01
+INFO:experiments.callback.progress:Epoch 7: loss 8.556e-01
+INFO:experiments.callback.progress:Epoch 8: loss 8.520e-01
+INFO:experiments.callback.progress:Epoch 9: loss 8.504e-01
+INFO:experiments.callback.progress:Epoch 10: loss 8.486e-01
+INFO:experiments.callback.progress:Epoch 11: loss 8.473e-01
+INFO:experiments.callback.progress:Epoch 12: loss 8.456e-01
+INFO:experiments.callback.progress:Epoch 13: loss 8.451e-01
+INFO:experiments.callback.progress:Epoch 14: loss 8.455e-01
+INFO:experiments.callback.progress:Epoch 15: loss 8.462e-01
+INFO:experiments.callback.progress:Epoch 16: loss 8.459e-01
+INFO:experiments.callback.progress:Epoch 17: loss 8.408e-01
+INFO:experiments.callback.progress:Epoch 18: loss 8.454e-01
+INFO:experiments.callback.progress:Epoch 19: loss 8.439e-01
+INFO:experiments.callback.progress:Epoch 20: loss 8.425e-01
+INFO:experiments.callback.progress:Epoch 21: loss 8.424e-01
+INFO:experiments.callback.progress:Epoch 22: loss 8.408e-01
+INFO:experiments.callback.progress:Epoch 23: loss 8.408e-01
+INFO:experiments.callback.progress:Epoch 24: loss 8.429e-01
+INFO:experiments.callback.progress:Epoch 25: loss 8.435e-01
+INFO:experiments.callback.progress:Epoch 26: loss 8.421e-01
+INFO:experiments.callback.progress:Epoch 27: loss 8.393e-01
+INFO:experiments.callback.progress:Epoch 28: loss 8.412e-01
+INFO:experiments.callback.progress:Epoch 29: loss 8.436e-01
+INFO:experiments.callback.progress:Epoch 30: loss 8.386e-01
+INFO:experiments.callback.progress:Epoch 31: loss 8.405e-01
+INFO:experiments.callback.progress:Epoch 32: loss 8.418e-01
+INFO:experiments.callback.progress:Epoch 33: loss 8.403e-01
+INFO:experiments.callback.progress:Epoch 34: loss 8.406e-01
+INFO:experiments.callback.progress:Epoch 35: loss 8.396e-01
+INFO:experiments.callback.progress:Epoch 36: loss 8.430e-01
+INFO:experiments.callback.progress:Epoch 37: loss 8.394e-01
+INFO:experiments.callback.progress:Epoch 38: loss 8.403e-01
+INFO:experiments.callback.progress:Epoch 39: loss 8.402e-01
+INFO:experiments.callback.progress:Epoch 40: loss 8.422e-01
+INFO:experiments.callback.progress:Epoch 41: loss 8.414e-01
+INFO:experiments.callback.progress:Epoch 42: loss 8.395e-01
+INFO:experiments.callback.progress:Epoch 43: loss 8.405e-01
+INFO:experiments.callback.progress:Epoch 44: loss 8.390e-01
+INFO:experiments.callback.progress:Epoch 45: loss 8.397e-01
+INFO:experiments.callback.progress:Epoch 46: loss 8.388e-01
+INFO:experiments.callback.progress:Epoch 47: loss 8.415e-01
+INFO:experiments.callback.progress:Epoch 48: loss 8.412e-01
+INFO:experiments.callback.progress:Epoch 49: loss 8.415e-01
+`Trainer.fit` stopped: `max_epochs=50` reached.
+INFO:experiments.callback.progress:Training done
+Average target velocity norm: tensor(2.3801)
+Average estimated velocity norm: tensor(1.3052)
+INFO:matplotlib.animation:Animation.save using <class 'matplotlib.animation.HTMLWriter'>
+Step 0: 1.1632059812545776
+Step 1: 1.123375654220581
+Step 2: 1.1110632419586182
+Step 3: 1.0933997631072998
+Step 4: 1.0727211236953735
+Step 5: 1.0461736917495728
+Step 6: 1.0165156126022339
+Step 7: 0.9843073487281799
+Step 8: 0.9497684240341187
+Step 9: 0.9126793742179871
+Step 10: 0.8742392659187317
+Step 11: 0.8340032696723938
+Step 12: 0.7935373187065125
+Step 13: 0.7526978254318237
+Step 14: 0.7133675217628479
+Step 15: 0.6800692677497864
+Step 16: 0.6515429615974426
+Step 17: 0.6203672885894775
+Step 18: 0.5816600322723389
+Step 19: 0.541426956653595
+Step 20: 0.49953415989875793
+Step 21: 0.45343470573425293
+Step 22: 0.4119296669960022
+Step 23: 0.36891990900039673
+Step 24: 0.321897953748703
+Step 25: 0.2709759473800659
+Step 26: 0.219927579164505
+Step 27: 0.17932379245758057
+Step 28: 0.1599997729063034
+Step 29: 0.15154308080673218
+Step 30: 0.1579105257987976
+Step 31: 0.18212522566318512
+Step 32: 0.22008544206619263
+Step 33: 0.27059805393218994
+Step 34: 0.3277719020843506
+Step 35: 0.3774000108242035
+Step 36: 0.424866259098053
+Step 37: 0.4718712866306305
+Step 38: 0.5141923427581787
+Step 39: 0.5610660314559937
+Step 40: 0.6230926513671875
+Step 41: 0.6873966455459595
+Step 42: 0.7516810894012451
+Step 43: 0.8125367760658264
+Step 44: 0.8708022832870483
+Step 45: 0.9323480725288391
+Step 46: 0.9994515776634216
+Step 47: 1.0662477016448975
+Step 48: 1.1324818134307861
+Step 49: 1.1957685947418213
+Step 50: 1.2526887655258179
+Step 51: 1.3034826517105103
+Step 52: 1.3486108779907227
+Step 53: 1.3920936584472656
+Step 54: 1.4395335912704468
+Step 55: 1.4934436082839966
+Step 56: 1.5501360893249512
+Step 57: 1.6106077432632446
+Step 58: 1.668883204460144
+Step 59: 1.7283120155334473
+Step 60: 1.778103232383728
+Step 61: 1.8090906143188477
+Step 62: 1.8277587890625
+Step 63: 1.841772198677063
+Step 64: 1.8582442998886108
+Step 65: 1.8853040933609009
+Step 66: 1.9207667112350464
+Step 67: 1.9593002796173096
+Step 68: 1.9982000589370728
+Step 69: 2.030740976333618
+Step 70: 2.0520248413085938
+Step 71: 2.062105655670166
+Step 72: 2.0593857765197754
+Step 73: 2.0450172424316406
+Step 74: 2.031400680541992
+Step 75: 2.035094976425171
+Step 76: 2.057162284851074
+Step 77: 2.08659029006958
+Step 78: 2.10471248626709
+Step 79: 2.107630491256714
+Step 80: 2.091275215148926
+Step 81: 2.055990219116211
+Step 82: 2.0287201404571533
+Step 83: 2.0148558616638184
+Step 84: 2.0090572834014893
+Step 85: 2.0061943531036377
+Step 86: 2.0074355602264404
+Step 87: 1.998128056526184
+Step 88: 1.9542163610458374
+Step 89: 1.9243847131729126
+Step 90: 1.9348161220550537
+Step 91: 1.93084716796875
+Step 92: 1.9105907678604126
+Step 93: 1.906804084777832
+Step 94: 1.8627557754516602
+Step 95: 1.8422050476074219
+Step 96: 2.0258572101593018
+Step 97: 2.4186747074127197
+Step 98: 3.0501325130462646
+Step 99: 5.28459358215332
+[[[ 1.060617   -0.28765067]
+  [ 0.01439387 -0.49190965]
+  [ 0.02062776  0.19552416]
+  ...
+  [-0.64723283 -1.1546108 ]
+  [ 0.83032066 -1.0083904 ]
+  [-1.0702541   0.15335643]]
+
+ [[ 1.0500108  -0.28477415]
+  [ 0.01424993 -0.48699057]
+  [ 0.02042148  0.19356892]
+  ...
+  [-0.6407605  -1.1430646 ]
+  [ 0.82201743 -0.9983065 ]
+  [-1.0595516   0.15182287]]
+
+ [[ 1.0393109  -0.28198326]
+  [ 0.01392682 -0.4820285 ]
+  [ 0.02029333  0.1914509 ]
+  ...
+  [-0.6347591  -1.1318907 ]
+  [ 0.8136398  -0.9883787 ]
+  [-1.0491378   0.15011178]]
+
+ ...
+
+ [[ 2.0659726  -0.23367094]
+  [ 0.4536918  -1.7793978 ]
+  [ 0.43747786  1.1943892 ]
+  ...
+  [-1.3306278  -1.5218583 ]
+  [ 0.8868755  -1.9298855 ]
+  [-1.564456    0.75289416]]
+
+ [[ 2.1284194  -0.25521654]
+  [ 0.47331822 -1.8270215 ]
+  [ 0.4403717   1.1854483 ]
+  ...
+  [-1.3229457  -1.5338696 ]
+  [ 0.88548565 -1.9666213 ]
+  [-1.5515668   0.76395345]]
+
+ [[ 2.1809034  -0.29109   ]
+  [ 0.5086416  -1.8837628 ]
+  [ 0.4225734   1.1868247 ]
+  ...
+  [-1.2962972  -1.500765  ]
+  [ 0.87267804 -1.9987285 ]
+  [-1.5275943   0.7759145 ]]]
+INFO:matplotlib.animation:Animation.save using <class 'matplotlib.animation.HTMLWriter'>
+/tmp/ipykernel_3863/1631704541.py:22: MatplotlibDeprecationWarning: The get_cmap function was deprecated in Matplotlib 3.7 and will be removed in 3.11. Use ``matplotlib.colormaps[name]`` or ``matplotlib.colormaps.get_cmap()`` or ``pyplot.get_cmap()`` instead.
+  cmap = cm.get_cmap('viridis', T)
+INFO:matplotlib.animation:Animation.save using <class 'matplotlib.animation.HTMLWriter'>
+INFO:matplotlib.animation:Animation.save using <class 'matplotlib.animation.HTMLWriter'>
+Traceback (most recent call last):
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 130, in get_root_modules
+    modules = rootmodules_cache[path]
+              ~~~~~~~~~~~~~~~~~^^^^^^
+KeyError: PosixPath('/home/mathis/Bureau/Stage - Code/StageTests/src')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completer.py", line 3214, in _complete
+    result = matcher(context)
+             ^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completer.py", line 2750, in custom_completer_matcher
+    matches = self.dispatch_custom_completer(context.token) or []
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completer.py", line 2790, in dispatch_custom_completer
+    res = c(event)
+          ^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 284, in module_completer
+    return module_completion(event.line)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 260, in module_completion
+    return get_root_modules()
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 132, in get_root_modules
+    modules = module_list(path)
+              ^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 86, in module_list
+    subdir = root[len(path)+1:]
+                  ^^^^^^^^^
+TypeError: object of type 'PosixPath' has no len()
+Traceback (most recent call last):
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 130, in get_root_modules
+    modules = rootmodules_cache[path]
+              ~~~~~~~~~~~~~~~~~^^^^^^
+KeyError: PosixPath('/home/mathis/Bureau/Stage - Code/StageTests/src')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completer.py", line 3214, in _complete
+    result = matcher(context)
+             ^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completer.py", line 2750, in custom_completer_matcher
+    matches = self.dispatch_custom_completer(context.token) or []
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completer.py", line 2790, in dispatch_custom_completer
+    res = c(event)
+          ^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 284, in module_completer
+    return module_completion(event.line)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 260, in module_completion
+    return get_root_modules()
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 132, in get_root_modules
+    modules = module_list(path)
+              ^^^^^^^^^^^^^^^^^
+  File "/home/mathis/anaconda3/lib/python3.12/site-packages/IPython/core/completerlib.py", line 86, in module_list
+    subdir = root[len(path)+1:]
+                  ^^^^^^^^^
+TypeError: object of type 'PosixPath' has no len()
