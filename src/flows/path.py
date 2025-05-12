@@ -99,6 +99,17 @@ class AffinePath(nn.Module):
 
         return t, x_t
     
+    def target_velocity(self, t: Tensor, x_0: Tensor, x_1: Tensor) -> Tensor:
+        """Closed‑form ground truth for ``v(t, x_t)`` (eq. 4.38)."""
+        if x_0.shape != x_1.shape:
+            raise ValueError("x_0 and x_1 must have identical shape.")
+        if t.dim() != 1:
+            raise ValueError("t must be 1‑D (batch dimension only).")
+
+        alpha_dt = self._broadcast_coeff(self.scheduler.alpha_dt(t), x_1.ndim)
+        sigma_dt = self._broadcast_coeff(self.scheduler.sigma_dt(t), x_0.ndim)
+        return alpha_dt * x_1 + sigma_dt * x_0
+
 
     def convert_parameterization(self, t, x_t, f_A, source_parameterization, target_parameterization):
         """
@@ -207,4 +218,10 @@ class AffinePath(nn.Module):
         a[mask], b[mask] = a_[mask], b_[mask]
     
         return a, b
+    
+    @staticmethod
+    def _broadcast_coeff(coeff: Tensor, target_rank: int) -> Tensor:
+        """Right‑broadcast *coeff* to match *target_rank*."""
+        return coeff.view(-1, *[1] * (target_rank - coeff.ndim))
+
 

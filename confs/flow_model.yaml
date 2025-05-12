@@ -22,7 +22,7 @@ flow_model:
     _target_: src.flows.path.AffinePath 
 
     scheduler:
-      _target_: src.flows.schedulers.OTScheduler  # or CosineScheduler
+      _target_: src.flows.schedulers.CosineScheduler  # or CosineScheduler
 
 
     t_law:

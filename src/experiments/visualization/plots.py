@@ -97,7 +97,7 @@ def animate_sampled_trajectories(
     """
     N = samples
     loader = DataLoader(dataset, batch_size=samples, shuffle=True)
-    x0, _ = next(iter(loader))
+    x0, _ , _= next(iter(loader))
 
     # Get trajectories and time points
     trajectories, t = flow_model.sample_trajectory(x0)  # (n_steps, N, D), (n_steps,)
@@ -151,7 +151,7 @@ def plot_trajectories_with_density(
     """
     # 1) Charger un batch
     loader = DataLoader(dataset, batch_size=N, shuffle=True)
-    x0, x1 = next(iter(loader))
+    x0, x1, _ = next(iter(loader))
     x0 = x0.to(flow_model.device)  # (N, 2)
     x1 = x1.to(flow_model.device)  # (N, 2)
 

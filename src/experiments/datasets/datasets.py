@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from torch.utils.data import Dataset
 import torch
+import numpy as np
 
 class CorruptedDataset(Dataset, ABC):
     def __init__(self, base_dataset, transform=None, target_transform=None):
@@ -72,17 +73,15 @@ class InpaintingDataset(CorruptedDataset):
         return x
     
 
-import torch
-from torch.utils.data import Dataset
 
 class GMM2GMM(Dataset):
     def __init__(self, means1, covs1, means2, covs2, num_samples):
         """
         Args:
-            means1 (Tensor): (K1, 2) means of the first GMM
-            covs1 (List[Tensor]): list of (2, 2) covariances for first GMM
-            means2 (Tensor): (K2, 2) means of the second GMM
-            covs2 (List[Tensor]): list of (2, 2) covariances for second GMM
+            means1 (Tensor): (K1, 2) means of the first GMM  (source)
+            covs1  (List[Tensor]): list of (2, 2) covariances for first GMM
+            means2 (Tensor): (K2, 2) means of the second GMM (target)
+            covs2  (List[Tensor]): list of (2, 2) covariances for second GMM
             num_samples (int): number of sample pairs to generate
         """
         super().__init__()
@@ -91,39 +90,59 @@ class GMM2GMM(Dataset):
         self.means2 = means2
         self.covs2 = covs2
         self.num_samples = num_samples
-        self.data = self.generate_samples()
 
-    def sample_from_gmm(self, means, covs, n_samples):
+        # -- generate and cache everything up front
+        self.data_src, self.data_tgt, self.labels_tgt = self._generate_samples()
+
+    @staticmethod
+    def _sample_from_gmm(means, covs, n_samples, *, return_labels=False):
         """
-        Sample from a Gaussian Mixture Model defined by means and covs.
-        Returns a (n_samples, 2) tensor.
+        Sample from a Gaussian Mixture Model.
+        If `return_labels` is True, also return the component index (LongTensor).
+
+        Returns
+        -------
+        samples : (n_samples, 2) Tensor
+        labels  : (n_samples,) LongTensor  (only if return_labels=True)
         """
         n_components = len(means)
-        indices = torch.randint(0, n_components, (n_samples,))
+        # draw a component index for every point
+        comp_idx = torch.randint(0, n_components, (n_samples,))
         samples = torch.empty((n_samples, 2))
 
-        for i in range(n_components):
-            count = (indices == i).sum().item()
-            if count > 0:
-                dist = torch.distributions.MultivariateNormal(means[i], covs[i])
-                samples[indices == i] = dist.sample((count,))
-        return samples
+        for k in range(n_components):
+            mask = comp_idx == k
+            count = mask.sum().item()
+            if count:
+                dist = torch.distributions.MultivariateNormal(means[k], covs[k])
+                samples[mask] = dist.sample((count,))
 
-    def generate_samples(self):
-        """
-        Generate (x0, x1) sample pairs from the two GMMs.
-        """
-        samples1 = self.sample_from_gmm(self.means1, self.covs1, self.num_samples)
-        samples2 = self.sample_from_gmm(self.means2, self.covs2, self.num_samples)
-        return samples1, samples2
+        return (samples, comp_idx.long()) if return_labels else samples
+
+    def _generate_samples(self):
+        """Generate (x_src, x_tgt, y_tgt) triplets."""
+        x_src = self._sample_from_gmm(self.means1, self.covs1, self.num_samples)
+        x_tgt, y_tgt = self._sample_from_gmm(
+            self.means2, self.covs2, self.num_samples, return_labels=True
+        )
+        return x_src, x_tgt, y_tgt
 
     def __len__(self):
         return self.num_samples
 
     def __getitem__(self, idx):
-        return self.data[0][idx], self.data[1][idx]
-
-import numpy as np
+        """
+        Returns
+        -------
+        x_src : (2,) Tensor         – a point from the source GMM
+        x_tgt : (2,) Tensor         – a point from the target GMM
+        y_tgt : ()   LongTensor int – component index of the target point
+        """
+        return (
+            self.data_src[idx],
+            self.data_tgt[idx],
+            self.labels_tgt[idx],
+        )
 
 def get_first_example_dataset(num_samples):
     # Parameters
