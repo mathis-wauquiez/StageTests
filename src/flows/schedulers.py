@@ -97,6 +97,8 @@ class OTScheduler(Scheduler):
         return -torch.ones_like(t)
     
 
+LinearScheduler = OTScheduler
+
 class CosineScheduler(Scheduler):
     """
     Cosine scheduler, X_t = sin(t * pi / 2) * X_1 + cos(t * pi / 2) * X_0
