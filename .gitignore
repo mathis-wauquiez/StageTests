@@ -1,0 +1,4 @@
+wandb/
+lightning_logs/
+*.pyc
+__pycache/*
