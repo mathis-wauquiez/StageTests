@@ -113,10 +113,12 @@ class Flow(LightningModule):
             # Run conditional & unconditional in *one* pass
             t_cat = torch.cat([t, t], dim=0)
             x_cat = torch.cat([x, x], dim=0)
+            y_cat = kwargs.pop("y")
+            y_cat = torch.cat([y_cat, y_cat], dim=0)
             cond_mask = torch.tensor([1, 0], device=x.device, dtype=torch.bool).repeat_interleave(
                 x.shape[0]
             )
-            out = self.model(t_cat, x_cat, cond_mask=cond_mask, **kwargs)
+            out = self.model(t_cat, x_cat, cond_mask=cond_mask, y=y_cat, **kwargs)
 
             # Convert to score
             out = self.path.convert_parameterization(
@@ -251,6 +253,11 @@ class Flow(LightningModule):
     # ------------------------------------------------------------------
 
     def _get_loss(self, x_0: Tensor, x_1: Tensor, t: Tensor, x_t: Tensor, **kwargs) -> Tensor:
+
+        if self.cfg.guidance == Guidance.CFG:
+            random_mask = torch.rand(x_0.shape[0], device=x_0.device) < self.cfg.guided_prob
+            kwargs.update({'cond_mask': random_mask})
+
         if self.cfg.predicts == Predicts.X0:
             return self.loss_fn(self.model(t, x_t, **kwargs), x_0)
         elif self.cfg.predicts == Predicts.X1:

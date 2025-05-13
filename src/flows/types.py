@@ -53,6 +53,7 @@ class FlowConfig:
     predicts: Predicts = Predicts.X1
     guidance: Guidance = Guidance.NONE
     guidance_scale: float = 1.0
+    guided_prob: float = 0.9 # train 90% of the time with labels
     compile: bool = True
 
     def __post_init__(self):

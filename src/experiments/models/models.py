@@ -63,6 +63,56 @@ class TimeConditionedMLP(nn.Module):
         full_input = torch.cat([x, gamma_t], dim=1)                    # (bs, x_dim + 2L)
         return self.mlp(full_input).view(x_shape)  # (bs, x_dim)
 
+class TimeAndLabelConditionedMLP(nn.Module):
+    def __init__(self,
+                 x_dim: int,
+                 output_dim: int,
+                 num_classes: int,
+                 y_emb_dim: int = 16,
+                 num_fourier_bands: int = 6,
+                 hidden_dim: int = 128,
+                 n_layers: int = 3):
+        super().__init__()
+        self.num_fourier_bands = num_fourier_bands
+        # label embedding
+        self.y_embed = nn.Embedding(num_classes, y_emb_dim)
+        # total input size = x + time‐emb + y‐emb
+        input_dim = x_dim + 2*num_fourier_bands + y_emb_dim
+        self.mlp = create_MLP(input_dim, output_dim, hidden_dim, n_layers)
+
+    def forward(self,
+                t: torch.Tensor,               # (,) or (bs,)
+                x: torch.Tensor,               # (bs, x_dim...)
+                cond_mask: torch.Tensor,       # (bs,) boolean
+                y: torch.LongTensor = None):   # (bs,) labels
+        
+        bs = x.shape[0]
+        device = x.device
+
+        # flatten x
+        x_flat = x.view(bs, -1)           # (bs, x_dim)
+
+        # time embedding
+        t = t.to(device)
+        # if t is scalar, expand to batch
+        if t.ndim == 0:
+            t = t.repeat(bs)
+        gamma_t = fourier_embedding(t, self.num_fourier_bands)  # (bs, 2L)
+
+        # label embedding (masked)
+        if y is None:
+            raise ValueError("y must be provided for label-conditioned MLP")
+        y_emb = self.y_embed(y.to(device))                      # (bs, y_emb_dim)
+        mask  = cond_mask.to(device).float().unsqueeze(1)       # (bs,1)
+        y_emb = y_emb * mask                                     # zero-out where cond_mask==False
+
+        # concat everything
+        inp = torch.cat([x_flat, gamma_t, y_emb], dim=1)        # (bs, total_dim)
+        out = self.mlp(inp)                                     # (bs, output_dim)
+
+        # restore original x shape if needed
+        return out.view(x.shape[0], *out.shape[1:])
+
 # === FiLM layer ===
 class FiLM(nn.Module):
     def __init__(self, time_dim, num_features):
@@ -75,6 +125,7 @@ class FiLM(nn.Module):
         gamma = gamma.unsqueeze(-1).unsqueeze(-1)  # (B, C, 1, 1)
         beta = beta.unsqueeze(-1).unsqueeze(-1)    # (B, C, 1, 1)
         return gamma * x + beta
+
 
 
 # === Convolutional block with FiLM ===
