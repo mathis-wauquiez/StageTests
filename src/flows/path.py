@@ -5,12 +5,18 @@ from torch import nn, Tensor
 import torch
 
 from .schedulers import Scheduler
+from .types import Predicts
+
 from .models import ModelWrapper
 from torch.distributions import Distribution
 from torch.distributions.uniform import Uniform
 
 import numpy as np
 
+
+# -----------------------------------------------------------------------------
+# Affine Paths Class
+# -----------------------------------------------------------------------------
 
 
 class AffinePath(nn.Module):
@@ -21,43 +27,36 @@ class AffinePath(nn.Module):
     using a scheduler, and supports converting model predictions between different parameterizations
     (e.g., `x_0`, `x_1`, `velocity`, `score`), as defined in the Meta PFGM++ framework.
 
-    Args:
-        scheduler (Scheduler): A scheduler object that defines the interpolation rules (e.g., alpha, sigma).
-        model (ModelWrapper): A wrapper around the model used to predict intermediate quantities (e.g., score, x0).
-        predicts (Literal["x_0", "x_1", "score"]): Type of prediction made by the model.
-        guidance (Optional[Literal["CFG", "classifier"]], optional): Type of conditional guidance to apply.
-        guidance_scale (float, optional): Scale for the guidance. Defaults to 1.0.
-        t_law (Optional[Distribution], optional): A PyTorch distribution to sample random time values from. Defaults to Uniform(0, 1).
-        classifier (Optional[nn.Module], optional): A classifier network used if `guidance="classifier"` is specified.
-
-    Raises:
-        ValueError: If classifier guidance is selected without providing a classifier.
-
-    Arguments in the methods:
-        x_0: Tensor (bs, ...), the initial state
-        x_1: Tensor (bs, ...), the final state
-        t: Tensor (bs, ...), the time step.
-        f_A: The value to convert (score, x_0, x_1, or velocity)
-        source_parameterization: The parameterization of the value to convert. Either x_0, x_1, score or velocity
-        target_parameterization: The parameterization to convert to. Either x_0, x_1, score or velocity
-
-    Methods:
-        sample(x_0, x_1, t=None):
-            Samples an intermediate point x_t between x_0 and x_1 at time t.
+    Parameters
+    ----------
+    scheduler : Scheduler
+        A scheduler object that defines the interpolation rules (e.g., alpha, sigma).
+    t_law : Optional[Distribution]
+        A PyTorch distribution to sample random time values from. Defaults to Uniform(0, 1).
         
-        estimated_velocity(x, t, **kwargs):
-            Estimates the velocity at time t using the model prediction.
+    Methods
+    -------
+    target_velocity(t, x_0, x_1):
+        Computes the target velocity at time t using the scheduler's alpha and sigma functions.
+    
+    sample(x_0, x_1, t=None):
+        Samples an intermediate point x_t between x_0 and x_1 at time t.
+        
+    convert_parameterization(x_t, t, f_A, source_parameterization, target_parameterization):
+        Converts a model prediction from one parameterization to another.
+        The parameterizations can be `x_0`, `x_1`, `velocity`, or `score`.
 
-        convert_parameterization(x_t, t, f_A, source_parameterization, target_parameterization):
-            Converts a model prediction from one parameterization to another.
+    _get_parameterization_conversion_coefficients(origin, target, t):
+        Computes the coefficients for converting between different parameterizations.
+        This is based on the equations provided in the Meta paper, Table 1.
 
     Example usage:
-        >>> model = ...  # Your model here. Should take (t, x) as input and output a tensor representing either x_0, x_1, or score.
         >>> scheduler = OTScheduler()
-        >>> path = AffinePath(scheduler, model, predicts="score")
+        >>> path = AffinePath(scheduler)
         >>> t, x_t = path.sample(x_0, x_1) # samples t~p_t(t) and x_t~p_t(x_t|x_0,x_1)
-        >>> v_t = path.estimated_velocity(x_t, t=t) # u^\theta(t, x_t)
-        >>> x_0_estimated = path.convert_parameterization(t, x_t, v_t, "v", "x_0")
+        >>> v_t = path.target_velocity(t, x_0, x_1)
+        >>> f_A = model.predict(t, x_t) # model prediction at time t. can be x_0, x_1, score or velocity
+        >>> x_0_estimated = path.convert_parameterization(t, x_t, f_A, source_parameterisation, "x_1")
         
     The convention is to always use the order (t, x_t) when calling methods.
     """
@@ -66,162 +65,237 @@ class AffinePath(nn.Module):
             self,
             scheduler: Scheduler,
             t_law: Optional[Distribution] = Uniform(low=0.0, high=1.0),
+            tol: float = 1e-3,
+            e_x: Optional[Tensor] = None # E[X_1]
     ):
         super().__init__()
+        if not isinstance(scheduler, Scheduler):
+            raise ValueError("Scheduler must be an instance of the Scheduler class.")
+        if not hasattr(t_law, "sample"):
+            raise ValueError("t_law must be a torch Distribution with a sample(batch_size) method.")
 
         self.scheduler = scheduler
         self.t_law = t_law
+        self.tol = tol
+        self.e_x = e_x
 
-        # Ensure the t_law is a valid distribution
-        if not hasattr(t_law, "sample"):
-            raise ValueError("t_law must be a valid distribution with a sample method")
+    def sample(self, x_0: Tensor, x_1: Tensor, t: Optional[Tensor] = None) -> tuple[Tensor, Tensor]:
         
-    def sample(self, x_0, x_1, t=None):
-        """
-        Sample from the conditional path.
-
-        Args:
-            x_0: Tensor (bs, ...), the initial state
-            x_1: Tensor (bs, ...), the final state
-            t: Optional[Tensor], the time steps to sample at. If None, sample from the t_law.
-        """
         if t is None:
             t = self.t_law.sample((x_0.shape[0],)).to(x_0.device)
 
-
         if t.dim() != 1:
-            raise ValueError("t must be a 1D tensor")
-        
-        if x_0.shape != x_1.shape:
-            raise ValueError("x_0 and x_1 must be the same shape")
-    
-        x_t = self.scheduler.sample(x_0, x_1, t)
+            raise ValueError("t must be a 1D tensor.")
 
+        x_t = self.scheduler.sample(x_0, x_1, t)
         return t, x_t
     
-    def target_velocity(self, t: Tensor, x_0: Tensor, x_1: Tensor) -> Tensor:
-        """Closed‑form ground truth for ``v(t, x_t)`` (eq. 4.38)."""
-        if x_0.shape != x_1.shape:
-            raise ValueError("x_0 and x_1 must have identical shape.")
-        if t.dim() != 1:
-            raise ValueError("t must be 1‑D (batch dimension only).")
 
-        alpha_dt = self._broadcast_coeff(self.scheduler.alpha_dt(t), x_1.ndim)
-        sigma_dt = self._broadcast_coeff(self.scheduler.sigma_dt(t), x_0.ndim)
+    def target_velocity(self, t: Tensor, x_0: Tensor, x_1: Tensor) -> Tensor:
+        if t.dim() != 1:
+            raise ValueError("t must be 1-D (batch dimension only).")
+        if x_0.shape != x_1.shape:
+            raise ValueError("x_0 and x_1 must be the same shape.")
+
+        alpha_dt = self._broadcast(self.scheduler.alpha_dt(t), x_1.ndim)
+        sigma_dt = self._broadcast(self.scheduler.sigma_dt(t), x_0.ndim)
         return alpha_dt * x_1 + sigma_dt * x_0
 
+    # ------------------------------------------------------------------
+    #  Convert between parameterizations
+    # ------------------------------------------------------------------
 
-    def convert_parameterization(self, t, x_t, f_A, source_parameterization, target_parameterization):
+
+    def convert_parameterization(self,
+                                 t: Tensor,
+                                 x_t: Tensor,
+                                 f_A: Tensor,
+                                 source_parameterization: Predicts,
+                                 target_parameterization: Predicts) -> Tensor:
         """
         Convert one type of parameterization to another.
         Can be used to convert between x_0, x_1, score and velocity, according to the table 1 in the Meta paper.
 
-        Args:
-            t: The time step.
-            x_t: The value of the path at time t
-            f_A: The value to convert
-            source_parameterization: The parameterization of the value to convert. Either x_0, x_1, score or velocity
-            target_parameterization: The parameterization to convert to. Either x_0, x_1, score or velocity
+        Example usage:
+            >>> x_0 = torch.randn(10, 3)
+            >>> x_1 = torch.randn(10, 3)
+            >>> t, x_t = path.sample(x_0, x_1)
+            >>> f_A = model.predict(t, x_t)
+            >>> converted_value = path.convert_parameterization(t, x_t, f_A, "x_0", "score")
         """
 
-        assert source_parameterization in ["v", "x_0", "x_1", "score", "velocity"], f"{source_parameterization} is not a valid parameterization"
-        assert target_parameterization in ["v", "x_0", "x_1", "score", "velocity"], f"{target_parameterization} is not a valid parameterization"
+        # ------------------------------------------------------ sanity checks
         assert x_t.shape == f_A.shape, f"x_t and f_A must be the same shape, got {x_t.shape} and {f_A.shape}"
-
-        # Coefficients are of shape (bs, )
-        a, b = self._get_parameterization_conversion_coefficients(source_parameterization, target_parameterization, t)
-
-        # Ensure proper shape for broadcasting
-        while a.ndim < x_t.ndim:
-            a = a.unsqueeze(-1)
-        while b.ndim < x_t.ndim:
-            b = b.unsqueeze(-1)
-
-        return a * x_t + b * f_A
-    
+        assert t.dim() == 1, f"t must be a 1-D tensor, got {t.dim()} dimensions"
         
+        source = Predicts.from_any(source_parameterization)
+        target = Predicts.from_any(target_parameterization)
 
-    def _get_parameterization_conversion_coefficients(self, origin, target, t):
-        """
-        Get the coefficients to convert from one parameterization to another. See table 1 p. 33 in the Meta paper.
         
-        Args:
-            origin: The parameterization to convert from. Either x_0, x_1, score or velocity
-            target: The parameterization to convert to. Either x_0, x_1, score or velocity
-            t: The time step to sample at.
+        self._check_valid_conversion(t, source_parameterization, target_parameterization)
+                
+        t_0_mask = torch.isclose(t, torch.zeros_like(t), atol=self.tol)
+        t_1_mask = torch.isclose(t, torch.ones_like(t), atol=self.tol)
+
+        output = torch.zeros_like(x_t)
+
+        # ------------------------------------------------------ t_0 and t_1 cases
+        if t_0_mask.any():
+            output[t_0_mask] = self._convert_parameterization_t0(t[t_0_mask], x_t[t_0_mask], f_A[t_0_mask], source, target)
+        if t_1_mask.any():
+            output[t_1_mask] = self._convert_parameterization_t1(t[t_1_mask], x_t[t_1_mask], f_A[t_1_mask], source, target)
+
+        # ------------------------------------------------------ General case
+        mask_t = torch.logical_not(t_0_mask) & torch.logical_not(t_1_mask)
+        if mask_t.any():
+            # Source to velocity
+            a, b = self._to_velocity_coeffs(t[mask_t], source)
+            a = self._broadcast(a, x_t.ndim)
+            b = self._broadcast(b, x_t.ndim)
+            velocity = a * x_t[mask_t] + b * f_A[mask_t]
+
+            # Velocity to target
+            a, b = self._from_velocity_coeffs(t[mask_t], target)
+            a = self._broadcast(a, x_t.ndim)
+            b = self._broadcast(b, x_t.ndim)
+            output[mask_t] = a * x_t[mask_t] + b * velocity
+        
+        return output
+
+
+
+    def _check_valid_conversion(self, t: Tensor, source: Predicts, target: Predicts) -> bool:
+        t_0_mask = torch.isclose(t, torch.zeros_like(t), atol=self.tol)
+        t_1_mask = torch.isclose(t, torch.ones_like(t), atol=self.tol)
+
+        # ------------------------------------------------------ t_1 check
+        if t_1_mask.any():
+            if target == Predicts.SCORE and source != Predicts.SCORE:
+                raise ValueError(f"Cannot convert from {source} to {target} when t=1")
+
+        # when t != 0 and t != 1, we can convert from any parameterization to any other
+
+
+    def _convert_parameterization_t0(self,
+                                 t: Tensor,
+                                 x_t: Tensor,
+                                 f_A: Tensor,
+                                 source: Predicts,
+                                 target: Predicts) -> Tensor:
         """
-
-        if origin == "velocity":
-            origin = "v"
-        if target == "velocity":
-            target = "v"
-
-        assert origin in ["v", "x_0", "x_1", "score"]
-        assert target in ["v", "x_0", "x_1", "score"]
-
-        a = torch.zeros_like(t)
-        b = torch.zeros_like(t)
+        Convert from one parameterization to another when t=0.
+        """
+        assert torch.isclose(t, torch.zeros_like(t), atol=self.tol).all(), f"t must be 0, got {t}"
 
         # Get the alpha and sigma values at time t
-        alpha = self.scheduler.alpha(t)
         alpha_dt = self.scheduler.alpha_dt(t)
-
         sigma = self.scheduler.sigma(t)
         sigma_dt = self.scheduler.sigma_dt(t)
 
-        # We manage the singularities when alpha = 0 or sigma = 0 (i.e. t = 0 or t = 1)
-        t_0_mask = torch.isclose(t, torch.zeros_like(t), atol=1e-3)
-        t_1_mask = torch.isclose(t, torch.ones_like(t), atol=1e-3)
+        # Ensure proper shape for broadcasting
+        alpha_dt = self._broadcast(alpha_dt, x_t.ndim)
+        sigma = self._broadcast(sigma, x_t.ndim)
+        sigma_dt = self._broadcast(sigma_dt, x_t.ndim)
 
-        # When t=0 or t=1, we can only convert to the velocity parameterization
-        # In this case, b=0 and a=sigma_dt or a=alpha_dt
-        if t_0_mask.any():
-            assert target == "v" or target==origin, f"Cannot convert to {target} when t=0"
-            a[t_0_mask] = sigma_dt[t_0_mask]
-            b[t_0_mask] = 0.0
+        if source == target:
+            return f_A
+        
+        if target == Predicts.X1:
+            return self._get_e_x(x_t)
+        
+        if target == Predicts.VELOCITY:
+            return sigma_dt * x_t + alpha_dt * self._get_e_x(x_t)
+        
+        if target == Predicts.X0:
+            return x_t
 
-        if t_1_mask.any():
-            assert target == "v" or target==origin, f"Cannot convert to {target} when t=1"
-            a[t_1_mask] = alpha_dt[t_1_mask]
-            b[t_1_mask] = 0.0
+        if target == Predicts.SCORE:
+            return - sigma**2 * x_t
 
-        # Coefficients for the conversion
-        target_origin_coefficients = {
-            "v": {                  # target
-                "v": (0.0, 1.0),    # origin
-                "x_1": (sigma_dt/sigma, (alpha_dt*sigma-sigma_dt*alpha)/sigma),
-                "x_0": (alpha_dt/alpha, (sigma_dt*alpha-alpha_dt*sigma)/alpha),
-                "score": (alpha_dt/alpha, -sigma * (sigma_dt*alpha-alpha_dt*sigma)/alpha),
-            },
-            "x_1": {
-                "x_1": (0.0, 1.0),
-                "x_0": (1/alpha, -sigma/alpha),
-                "score": (1/alpha, -sigma**2/alpha),
-            },
-            "x_0": {
-                "x_0": (0.0, 1.0),
-                "score": (0, -sigma),
-            },
-            "score": {
-                "score": (0.0, 1.0)
-            }
-        }
+    def _convert_parameterization_t1(self,
+                                 t: Tensor,
+                                 x_t: Tensor,
+                                 f_A: Tensor,
+                                 source: Predicts,
+                                 target: Predicts) -> Tensor:
+        """
+        Convert from one parameterization to another when t=1.
+        """
+        assert torch.isclose(t, torch.ones_like(t), atol=self.tol).all(), f"t must be 1, got {t}"
 
-        mask = torch.logical_not(t_0_mask) & torch.logical_not(t_1_mask)
+        alpha_dt = self.scheduler.alpha_dt(t)
+        alpha_dt = self._broadcast(alpha_dt, x_t.ndim)
 
-        if origin in target_origin_coefficients[target]:
-            a_, b_ = target_origin_coefficients[target][origin]
-        else:
-            a_, b_ = target_origin_coefficients[origin][target]
-            a_, b_ = -a_/b_, 1/b_
+        if source == target:
+            return x_t
+        
+        if target == Predicts.X0:
+            return torch.zeros_like(x_t)
+        if target == Predicts.X1:
+            return x_t
+        if target == Predicts.VELOCITY:
+            return alpha_dt * x_t
 
-        a[mask], b[mask] = a_[mask], b_[mask]
+    def _to_velocity_coeffs(self,
+                    t: Tensor,
+                    source: Predicts) -> Tensor:
+        """
+        Convert from one parameterization to velocity when t!=0 and t!=1.
+        """
+        assert t.dim() == 1, f"t must be a 1-D tensor, got {t.dim()} dimensions"
+        t_0_mask = torch.isclose(t, torch.zeros_like(t), atol=self.tol)
+        t_1_mask = torch.isclose(t, torch.ones_like(t), atol=self.tol)
+        assert not (t_0_mask | t_1_mask).any(), "this function does not support t=0 or t=1. please use convert_parameterization() directly"
+
+        sigma = self.scheduler.sigma(t)
+        sigma_dt = self.scheduler.sigma_dt(t)
+        alpha_dt = self.scheduler.alpha_dt(t)
+        alpha = self.scheduler.alpha(t)
+
+        if source == Predicts.VELOCITY:
+            return (torch.zeros_like(t), torch.ones_like(t))
+        if source == Predicts.X1:
+            return sigma_dt/sigma, \
+                    (alpha_dt*sigma-sigma_dt*alpha)/sigma
+        if source == Predicts.X0:
+            return alpha_dt/alpha,\
+                    (sigma_dt*alpha-alpha_dt*sigma)/alpha
+        if source == Predicts.SCORE:
+            return alpha_dt/alpha,\
+                    -sigma * (sigma_dt*alpha-alpha_dt*sigma)/alpha
+
+        raise ValueError(f"Cannot convert from {source} to velocity when t!=0 and t!=1")
     
-        return a, b
-    
+
+    def _from_velocity_coeffs(self,
+                    t: Tensor,
+                    target: Predicts) -> tuple[Tensor, Tensor]:
+        """
+        Convert from velocity to one parameterization when t!=0 and t!=1.
+        """
+        if target == Predicts.VELOCITY:
+            return torch.zeros_like(t), torch.ones_like(t)
+        
+        a, b = self._to_velocity_coeffs(t, target)
+
+        # v = a * x_t + b * f_A
+        # => f_A = (v - a * x_t) / b
+        # <=> f_A = -a/b * x_t + 1/b * v
+
+        return -a/b, 1/b
+
+            
     @staticmethod
-    def _broadcast_coeff(coeff: Tensor, target_rank: int) -> Tensor:
+    def _broadcast(coeff: Tensor, target_rank: int) -> Tensor:
         """Right‑broadcast *coeff* to match *target_rank*."""
         return coeff.view(-1, *[1] * (target_rank - coeff.ndim))
 
 
+    def _get_e_x(self, x_t: Tensor) -> Tensor:
+        if self.e_x is None:
+            return torch.zeros_like(x_t)
+        
+        x_shape = x_t.shape[1:]
+        e_x = self.e_x.view(1, *x_shape)
+        e_x = e_x.expand(x_t.shape[0], *x_shape)
+        return e_x

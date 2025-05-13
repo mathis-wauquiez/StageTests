@@ -14,48 +14,18 @@ from pytorch_lightning import LightningModule
 
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
+from omegaconf import DictConfig
 
 from .path import AffinePath
 from .schedulers import Scheduler
 from .models import ModelWrapper
 from .utils import _to_tensor_scalar
-
-# -----------------------------------------------------------------------------
-# Enumerations
-# -----------------------------------------------------------------------------
-
-Predicts = Literal["x_0", "x_1", "score"]
-
-class Predicts(str, Enum):
-    X0 = "x_0"
-    X1 = "x_1"
-    SCORE = "score"
-
-    _ALIASES: Dict[str, Predicts] = {"x0": X0, "x_0": X0, "x1": X1, "x_1": X1, "score": SCORE}
-
-    @classmethod
-    def from_any(cls, value: Predicts | str) -> Predicts:
-        if isinstance(value, cls):
-            return value
-        return cls._ALIASES[str(value).lower()]
-
-
-class Guidance(str, Enum):
-    NONE = "none"
-    CFG = "CFG"
-    CLASSIFIER = "classifier"
+from .types import Predicts, Guidance, FlowConfig
 
 
 # -----------------------------------------------------------------------------
-# Configuration Dataclass
+# Flow Class
 # -----------------------------------------------------------------------------
-
-@dataclass
-class FlowConfig:
-    predicts: Predicts = Predicts.X1
-    guidance: Guidance = Guidance.NONE
-    guidance_scale: float = 1.0
-    compile: bool = True  # ← new optional flag
 
 class Flow(LightningModule):
 
@@ -82,37 +52,28 @@ class Flow(LightningModule):
             Supervised loss applied to the chosen prediction target.
         model : ModelWrapper
             Neural network that predicts ``x_0``, ``x_1`` or the score.
-        predicts : Predicts, default=Predicts.SCORE
-            What *kind* of object ``model`` outputs.
-        guidance : Guidance, default=Guidance.NONE
-            Guidance strategy to use **during sampling only**.
-        guidance_scale : float, default=1.0
-            Scale for guidance (see DDPM / CFG literature).
+        cfg: FlowConfig
+            Configuration for the flow model, including prediction type and guidance.
         classifier : nn.Module | None, default=None
             Classifier used for classifier guidance.
         optimizer_cfg, scheduler_cfg, solver_cfg : dict | OmegaConf | None
             Hydra‑style instantiation configs.
+            If None, defaults to the model's optimizer and scheduler.
         """
         super().__init__()
 
-        # --------------------------- canonicalise enums ---------------------------
-        predicts = Predicts.from_any(predicts)
-        if guidance is None:
-            guidance = Guidance.NONE
-        else:
-            guidance = Guidance(guidance) if not isinstance(guidance, Guidance) else guidance
-
         # --------------------------- sanity checks ---------------------------
+        
+        guidance = cfg.guidance
+        
         if guidance == Guidance.CLASSIFIER and classifier is None:
             raise ValueError("Classifier guidance requested but no classifier provided.")
         if guidance == Guidance.CFG and classifier is not None:
             raise ValueError("Cannot mix Classifier‑Free Guidance with an explicit classifier.")
-        if guidance == Guidance.CLASSIFIER and predicts not in (Predicts.X0, Predicts.SCORE):
-            raise ValueError("Classifier guidance needs x_0 or score prediction.")
 
         # --------------------------- members ---------------------------
         self.path = path
-        self.model = torch.compile(model) if self.cfg.compile else model
+        self.model = torch.compile(model) if cfg.compile else model
         self.loss_fn = loss_fn
         self.cfg = cfg
         self.classifier = classifier.to(self.device).eval() if classifier else None
@@ -141,7 +102,7 @@ class Flow(LightningModule):
         if t.dim() == 0:
             t = t.unsqueeze(0).expand(x.shape[0])
 
-        predicts = self.cfg.predicts
+        source_parameterization = self.cfg.predicts
 
         # ---------------------------------------------------------------- cfg
         if self.cfg.guidance == Guidance.CFG:
@@ -159,13 +120,13 @@ class Flow(LightningModule):
 
             # Convert to score
             out = self.path.convert_parameterization(
-                t_cat, x_cat, out, predicts, "score"
+                t_cat, x_cat, out, source_parameterization, Predicts.SCORE
             )
 
             # Apply guidance
             cond, uncond = out.chunk(2)
             outputs = uncond + self.cfg.guidance_scale * (cond - uncond)
-            predicts = "score"
+            source_parameterization = Predicts.SCORE
 
         
         # ------------------------------------------------------------ classifier
@@ -173,29 +134,43 @@ class Flow(LightningModule):
             if "y" not in kwargs:
                 raise ValueError("Classifier guidance requires class labels 'y'.")
             y = kwargs.pop("y")
-            
-            # Calculate the unconditional score
+
+            # --- unconditional score
             net_out = self.model(t, x, **kwargs)
-            score = self.path.convert_parameterization(t, x, net_out, self.cfg.predicts.value, "score")
+            score  = self.path.convert_parameterization(
+                t, x, net_out, self.cfg.predicts.value, Predicts.SCORE
+            )
 
-            # Calculate ∇ₓ log p(y|x)
-            x_req = x.detach().requires_grad_()
-            logits = self.classifier(x_req)  # shape: (bs, num_classes)
-            log_p = torch.log_softmax(logits, dim=-1)[torch.arange(len(y), device=x.device), y]
-            grad_x = torch.autograd.grad(log_p.sum(), x_req, create_graph=False)[0].detach()
+            # --- classifier gradient (re-enable grad)
+            with torch.enable_grad():
+                x_req = x.detach().requires_grad_(True)
+                logits = self.classifier(x_req)
+                log_p  = torch.log_softmax(logits, dim=-1)[
+                            torch.arange(len(y), device=x.device), y
+                        ]
+                grad_x = torch.autograd.grad(log_p.sum(), x_req)[0]
 
-            _, b = self.path._get_parameterization_conversion_coefficients(self.cfg.predicts.value, "score", t)
-            outputs = score + b * self.cfg.guidance_scale * grad_x # eq 4.87 p.33
-            predicts = Predicts.SCORE
+            grad_x = grad_x.detach()
 
+
+            # eq 4.90 p.34
+
+            outputs = self.path.convert_parameterization(
+                t,
+                x,
+                f_A=score + self.cfg.guidance_scale * grad_x,
+                source_parameterization=Predicts.SCORE,
+                target_parameterization=Predicts.VELOCITY,
+            )
+
+            source_parameterization = Predicts.VELOCITY
         # ---------------------------------------------------------------- none
         else:
             outputs = self.model(t, x, **kwargs)
-            predicts = self.cfg.predicts
+            source_parameterization = self.cfg.predicts
 
         # Final conversion → velocity
-        source_parameterization = predicts.value if isinstance(predicts, Enum) else predicts
-        return self.path.convert_parameterization(t, x, outputs, source_parameterization, "v")
+        return self.path.convert_parameterization(t, x, outputs, source_parameterization, Predicts.VELOCITY)
 
 
     # ------------------------------------------------------------------
@@ -285,11 +260,17 @@ class Flow(LightningModule):
             v_theta = self.path.convert_parameterization(t, x_t, pred_score, "score", "v")
             v_target = self.target_velocity(t, x_0, x_1)
             return self.loss_fn(v_theta, v_target)
+        elif self.cfg.predicts == Predicts.VELOCITY:
+            v_theta = self.model(t, x_t, **kwargs)
+            v_target = self.path.target_velocity(t, x_0, x_1)
+            return self.loss_fn(v_theta, v_target)
         else:
             raise RuntimeError("Unknown prediction type.")
 
 
-    # Basic Lightning hooks ----------------------------------------------------
+    # ------------------------------------------------------------------
+    #  Basic Lightning Hooks
+    # ------------------------------------------------------------------
 
     def training_step(self, batch, batch_idx):
         if len(batch) == 3:
@@ -298,8 +279,10 @@ class Flow(LightningModule):
             x_0, x_1 = batch
             y = None
 
+        pass_y = y if self.cfg.guidance in (Guidance.CFG, Guidance.CLASSIFIER) else None
+
         t, x_t = self.path.sample(x_0, x_1)
-        loss = self._get_loss(x_0, x_1, t, x_t, y=y) if y is not None else self._get_loss(
+        loss = self._get_loss(x_0, x_1, t, x_t, y=y) if pass_y is not None else self._get_loss(
             x_0, x_1, t, x_t
         )
         self.log_dict({"train_loss": loss}, prog_bar=True, on_step=True, on_epoch=True)
@@ -323,17 +306,39 @@ class Flow(LightningModule):
     #  Optimiser & scheduler
     # ------------------------------------------------------------------
 
-
     def configure_optimizers(self):
-        optimizer = instantiate(self.optimizer_cfg, params=self.parameters())
+        opt_cfg = self.optimizer_cfg
+
+        # if Hydra saw `_partial_: true` it will have turned
+        # `opt_cfg` into a `functools.partial`, so just call it:
+        if isinstance(opt_cfg, partial) or callable(opt_cfg):
+            optimizer = opt_cfg(params=self.parameters())
+
+        # otherwise assume it’s a DictConfig or plain dict
+        # describing how to build the optimizer:
+        elif isinstance(opt_cfg, (DictConfig, dict)):
+            optimizer = instantiate(opt_cfg, params=self.parameters())
+
+        else:
+            raise TypeError(
+                f"optimizer_cfg must be a DictConfig/dict or a callable/partial, "
+                f"but got {type(opt_cfg)}"
+            )
+
+        # now do the same trick for the scheduler if you have one
         if self.scheduler_cfg:
-            scheduler = instantiate(self.scheduler_cfg, optimizer=optimizer)
+            sched_cfg = self.scheduler_cfg
+            if isinstance(sched_cfg, partial) or callable(sched_cfg):
+                scheduler = sched_cfg(optimizer=optimizer)
+            else:
+                scheduler = instantiate(sched_cfg, optimizer=optimizer)
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
                     "interval": "step",
-                    "frequency": 1
-                }
+                    "frequency": 1,
+                },
             }
+
         return optimizer

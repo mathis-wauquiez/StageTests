@@ -86,6 +86,7 @@ def animate_sampled_trajectories(
     flow_model,
     dataset,
     samples=500,
+    y=None
 ):
     """
     Animates trajectories returned by `flow_model.sample_trajectory(x0)`.
@@ -99,8 +100,12 @@ def animate_sampled_trajectories(
     loader = DataLoader(dataset, batch_size=samples, shuffle=True)
     x0, _ , _= next(iter(loader))
 
+    if y is not None:
+        # y is a int that we need to expand to the batch size
+        y = torch.full((N,), y, device=x0.device)
+
     # Get trajectories and time points
-    trajectories, t = flow_model.sample_trajectory(x0)  # (n_steps, N, D), (n_steps,)
+    trajectories, t = flow_model.sample_trajectory(x0, y=y)  # (n_steps, N, D), (n_steps,)
     trajectories = trajectories.detach().cpu().numpy()
 
     fig, ax = plt.subplots()
