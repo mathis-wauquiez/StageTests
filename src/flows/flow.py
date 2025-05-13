@@ -94,7 +94,7 @@ class Flow(LightningModule):
     # Velocity field
     # ------------------------------------------------------------------
 
-    def estimated_velocity(self, t, x, **kwargs):
+    def estimated_velocity(self, t, x, y=None, **kwargs):
         """Network‑based estimate of the true velocity ``v_θ(t,x_t)``."""
 
         # Torchdiffeq passes scalars → make them batch tensors
@@ -104,17 +104,13 @@ class Flow(LightningModule):
 
         source_parameterization = self.cfg.predicts
 
+
         # ---------------------------------------------------------------- cfg
-        if self.cfg.guidance == Guidance.CFG:
-
-            if "y" not in kwargs:
-                raise ValueError("Classifier-free guidance requires labels 'y'.")
-
+        if self.cfg.guidance == Guidance.CFG and y is not None:
             # Run conditional & unconditional in *one* pass
             t_cat = torch.cat([t, t], dim=0)
             x_cat = torch.cat([x, x], dim=0)
-            y_cat = kwargs.pop("y")
-            y_cat = torch.cat([y_cat, y_cat], dim=0)
+            y_cat = torch.cat([y, y], dim=0)
             cond_mask = torch.tensor([1, 0], device=x.device, dtype=torch.bool).repeat_interleave(
                 x.shape[0]
             )
@@ -132,11 +128,7 @@ class Flow(LightningModule):
 
         
         # ------------------------------------------------------------ classifier
-        elif self.cfg.guidance == Guidance.CLASSIFIER:
-            if "y" not in kwargs:
-                raise ValueError("Classifier guidance requires class labels 'y'.")
-            y = kwargs.pop("y")
-
+        elif self.cfg.guidance == Guidance.CLASSIFIER and y is not None:
             # --- unconditional score
             net_out = self.model(t, x, **kwargs)
             score  = self.path.convert_parameterization(
@@ -168,6 +160,12 @@ class Flow(LightningModule):
             source_parameterization = Predicts.VELOCITY
         # ---------------------------------------------------------------- none
         else:
+            if self.cfg.guidance == Guidance.CFG: # y is None and CFG is requested
+                y = torch.zeros(x.shape[0], device=x.device, dtype=torch.long)
+                cond_mask = torch.zeros(x.shape[0], device=x.device, dtype=torch.bool)
+                kwargs.update({"y": y, "cond_mask": cond_mask})
+
+            # No guidance
             outputs = self.model(t, x, **kwargs)
             source_parameterization = self.cfg.predicts
 
@@ -223,13 +221,7 @@ class Flow(LightningModule):
         if "method" not in solver_cfg:
             solver_cfg["method"] = "midpoint"
 
-        # Define the velocity field depending on guidance
-        if self.cfg.guidance in (Guidance.CFG, Guidance.CLASSIFIER):
-            if y is None:
-                raise ValueError("Guidance requires labels 'y'.")
-            velocity_field = lambda t, x: self.estimated_velocity(t, x, y=y)
-        else:
-            velocity_field = self.estimated_velocity
+        velocity_field = lambda t, x: self.estimated_velocity(t, x, y=y)
 
 
         with torch.no_grad():
@@ -253,7 +245,7 @@ class Flow(LightningModule):
     # ------------------------------------------------------------------
 
     def _get_loss(self, x_0: Tensor, x_1: Tensor, t: Tensor, x_t: Tensor, **kwargs) -> Tensor:
-
+        
         if self.cfg.guidance == Guidance.CFG:
             random_mask = torch.rand(x_0.shape[0], device=x_0.device) < self.cfg.guided_prob
             kwargs.update({'cond_mask': random_mask})

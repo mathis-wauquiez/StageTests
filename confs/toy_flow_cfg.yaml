@@ -34,13 +34,14 @@ flow_model:
     predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
     guidance: "CFG"  # or "classifier", "CFG"
     guidance_scale: 1.0
+    guided_prob: 0.5
     compile: false # works only with nn.Module
 
 
   optimizer_cfg:
     _target_: torch.optim.Adam
     _partial_: true     # ← important!
-    lr: 0.0005
+    lr: 0.001
     weight_decay: 0.0
     betas:
       - 0.9

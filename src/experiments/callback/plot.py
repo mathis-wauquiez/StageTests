@@ -20,9 +20,9 @@ class GenerationPlotCallback(pl.Callback):
         pl_module.eval()
         with torch.no_grad():
             x0 = torch.randn(self.num_samples, 28*28).to(pl_module.device)
-            x0 = x0.view(self.num_samples, 1, 28, 28)
             samples = pl_module.sample(x0)  # Shape: (N, C, H, W)
             samples = (samples * 0.3081) + 0.1307
+            samples = samples.view(self.num_samples, 1, 28, 28)
             samples = torch.clamp(samples, 0, 1)
             samples = samples.cpu()
 
