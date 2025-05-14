@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
+from IPython.display import clear_output
 import torch
 import os
 
@@ -25,6 +26,9 @@ class GenerationPlotCallback(pl.Callback):
             samples = samples.view(self.num_samples, 1, 28, 28)
             samples = torch.clamp(samples, 0, 1)
             samples = samples.cpu()
+
+        # clear previous notebook output
+        clear_output(wait=True)
 
         n = int(self.num_samples ** 0.5)
         fig, axes = plt.subplots(n, n, figsize=(n, n))

@@ -54,7 +54,7 @@ class FlowConfig:
     guidance: Guidance = Guidance.NONE
     guidance_scale: float = 1.0
     guided_prob: float = 0.9 # train 90% of the time with labels
-    compile: bool = True
+    compile: bool = False
 
     def __post_init__(self):
         # Ensure string aliases work when loaded from YAML

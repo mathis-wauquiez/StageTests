@@ -1,0 +1,24 @@
+defaults:
+  - base
+
+max_epochs: 50
+gradient_clip_val: 1.0
+detect_anomaly: true
+reload_dataloaders_every_n_epochs: 1
+
+deterministic: true
+
+callbacks:
+  - _target_: pytorch_lightning.callbacks.TQDMProgressBar
+    refresh_rate: 1
+    leave: true
+
+  - _target_: experiments.callback.plot.GenerationPlotCallback
+    num_samples: 16
+
+# logger:
+#   - _target_: pytorch_lightning.loggers.WandbLogger
+#     project: "StageTests"
+#     name: "v0"
+#     save_dir: "wandb/"
+#     log_model: false

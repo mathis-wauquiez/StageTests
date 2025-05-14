@@ -1,0 +1,22 @@
+defaults:
+  - toy_flow # this imports the toy_flow.yaml config
+
+
+# The model used to parameterize the flow
+model:
+  _target_: src.experiments.models.models.TimeAndLabelConditionedMLP
+  x_dim: 2
+  output_dim: 2
+  num_classes: 5
+  y_emb_dim: 16
+  num_fourier_bands: 4
+  hidden_dim: 64
+  n_layers: 3
+
+# The configuration for the flow
+cfg:
+  _target_: src.flows.types.FlowConfig
+  predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
+  guidance: "CFG"  # or "classifier", "CFG"
+  guidance_scale: 1.0
+  guided_prob: 0.5

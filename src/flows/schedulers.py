@@ -3,7 +3,9 @@ from abc import ABC, abstractmethod
 from torch import nn, Tensor
 import torch
 
-from .models import ModelWrapper
+from scipy.interpolate import CubicSpline
+import numpy as np
+
 
 
 class Scheduler(ABC, nn.Module):
@@ -122,3 +124,59 @@ class CosineScheduler(Scheduler):
         """
         return torch.tan(t * torch.pi / 2)
     
+
+class InterpolatedScheduler(Scheduler):
+    """
+    This scheduler uses a cubic spline to interpolate a DDPM VP scheduler.
+    """
+    def __init__(self, alphas_cumprod: Tensor):
+        """
+        alphas_cumprod: 1D Tensor of length T, values in (0,1].
+        """
+        super().__init__()
+        # keep original tensor (for device/dtype) and build numpy spline
+        self.alphas_cumprod = alphas_cumprod
+        acp_np = alphas_cumprod.cpu().numpy()
+        grid = np.linspace(0.0, 1.0, len(acp_np))
+        self._cs = CubicSpline(grid, acp_np)
+        self._cs_der = self._cs.derivative()
+
+    def alpha(self, t: Tensor) -> Tensor:
+        # α(t) = sqrt( ᾱ(1−t) )
+        t_np = t.cpu().numpy()
+        s = 1.0 - t_np
+        abar = self._cs(s)
+        out = np.sqrt(abar)
+        return torch.tensor(out, device=t.device, dtype=t.dtype)
+
+    def sigma(self, t: Tensor) -> Tensor:
+        # σ(t) = sqrt(1 − ᾱ(1−t))
+        t_np = t.cpu().numpy()
+        s = 1.0 - t_np
+        abar = self._cs(s)
+        out = np.sqrt(1.0 - abar)
+        return torch.tensor(out, device=t.device, dtype=t.dtype)
+
+    def alpha_dt(self, t: Tensor) -> Tensor:
+        """
+        dα/d(1−t) = d/ds [ sqrt( ᾱ(s) ) ]
+                  = (1/(2√ᾱ(s))) * ᾱ′(s)
+        """
+        t_np = t.cpu().numpy()
+        s = 1.0 - t_np
+        abar = self._cs(s)
+        d_abar = self._cs_der(s)
+        out = d_abar / (2.0 * np.sqrt(abar))
+        return torch.tensor(out, device=t.device, dtype=t.dtype)
+
+    def sigma_dt(self, t: Tensor) -> Tensor:
+        """
+        dσ/d(1−t) = d/ds [ sqrt(1−ᾱ(s)) ]
+                  = −ᾱ′(s) / (2√(1−ᾱ(s)))
+        """
+        t_np = t.cpu().numpy()
+        s = 1.0 - t_np
+        abar = self._cs(s)
+        d_abar = self._cs_der(s)
+        out = -d_abar / (2.0 * np.sqrt(1.0 - abar))
+        return torch.tensor(out, device=t.device, dtype=t.dtype)

@@ -1,0 +1,9 @@
+defaults:
+  - toy_flow # this imports the toy_flow.yaml config
+
+
+
+# The configuration for the flow
+cfg:
+  guidance: "classifier"  # or "classifier", "CFG"
+  guidance_scale: 1.0

@@ -1,0 +1,23 @@
+_target_: src.flows.flow.Flow
+
+# The path used during the flow; only AffinePath is supported
+path:
+  _target_: src.flows.path.AffinePath 
+
+  scheduler:
+    _target_: src.flows.schedulers.OTScheduler  # or CosineScheduler
+
+# The loss function used to train the model
+loss_fn:
+  _target_: src.flows.losses.MSEFlowMatchingLoss
+
+# The configuration for the flow
+cfg:
+  _target_: src.flows.types.FlowConfig
+  predicts: "x_0" # or "x_0", "score", "velocity", what the model predicts
+
+
+optimizer_cfg:
+  _target_: torch.optim.Adam
+  _partial_: true     # ← important!
+  lr: 0.0005
