@@ -1,21 +1,7 @@
-# train_loader = torch.utils.data.DataLoader(
-#     train_dataset,
-#     batch_size=30,
-#     num_workers=0,
-#     pin_memory=True,
-# )
-
-# TrainOverride(
-#     image_path=image_path,
-#     mask_box=test_dataset.region_box,
-#     seed=seed
-# )
-
-
 train_loader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 20
-  num_workers: 0
+  batch_size: 240
+  num_workers: 8
   pin_memory: true
 
   dataset:

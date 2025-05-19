@@ -28,14 +28,18 @@ def train_model(cfg: DictConfig):
         cfg (DictConfig): Configuration object containing training parameters.
     """
 
+    dir = next_version_dir()
+    output_dir = Path("outputs") / dir
+
     train_loader = instantiate(cfg.data.train_loader)
     test_loader = instantiate(cfg.data.test_loader)
 
     effective_batch_size = cfg.data.train_loader.batch_size * cfg.trainer.accumulate_grad_batches
-    lr = 1e-4 * effective_batch_size / 256
+    lr = 1e-4 * effective_batch_size / 512
     cfg.flow_model.optimizer_cfg.lr = lr
 
     flow_model = instantiate(cfg.flow_model, to_natural_fn=train_loader.dataset.to_natural)
+    flow_model.dir = output_dir
     trainer = instantiate(cfg.trainer)
 
     
@@ -43,8 +47,7 @@ def train_model(cfg: DictConfig):
     trainer.fit(flow_model, train_loader, test_loader)
     trainer.test(flow_model, test_loader)
 
-    output_dir = current_version_dir()
-    output_dir = Path(output_dir)
+    
     torch.save(flow_model.state_dict(), output_dir / "model.pth")
     print(f"Model saved to {output_dir / 'model.pth'}")
 

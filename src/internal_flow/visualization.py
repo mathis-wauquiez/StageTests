@@ -6,7 +6,7 @@ import itertools
 
 from pathlib import Path
 
-def visualize(x_0, x_1, x_pred, ema=False):
+def visualize(x_0, x_1, x_pred, ema=False, dir=None):
     """
     Visualize the original and inpainted images.
     """
@@ -26,7 +26,10 @@ def visualize(x_0, x_1, x_pred, ema=False):
     plt.tight_layout()
     
     # Save the figure
-    dir = Path(current_version_dir())
+    if dir is None:
+        dir = Path(current_version_dir())
+    else:
+        dir = Path(dir)
 
     filename_ext = "_ema" if ema else ""
 

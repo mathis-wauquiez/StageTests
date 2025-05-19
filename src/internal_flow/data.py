@@ -158,7 +158,7 @@ class SingleImageTrainDataset(IterableDataset):
     """Infinite train dataset returning (corrupt, clean, mask) tuples."""
 
     files = ["diffuse.png", "normal.png", "roughness.png", "specular.png"]
-    size = 5000 # one epoch = k iterations
+    size = 20000 # one epoch = k iterations
 
     def __init__(self, image_path, mask_path, region_size=(256, 256), seed=None):
 

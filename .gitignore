@@ -4,3 +4,7 @@ lightning_logs/
 __pycache/*
 /checkpoints
 /outputs
+myenv.yaml
+.gitignore
+.gitignore
+/logs

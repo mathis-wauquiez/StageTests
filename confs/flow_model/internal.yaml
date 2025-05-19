@@ -4,7 +4,7 @@ defaults:
 _target_: src.internal_flow.flow.InpaintingFlow
 
 viz: ${viz}
-ema_decay: 0.9995
+ema_decay: 0.9999
 
 # The model used to parameterize the flow
 model:

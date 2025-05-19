@@ -91,7 +91,7 @@ class Model(nn.Module):
         assert y is not None, "y must be provided"
 
         # Encode t and reshape it to image size
-        t_embedding = self.time_encoder(t.to("cuda"))
+        t_embedding = self.time_encoder(t.to(x_t.device))
         t_embedding = self.time_encoder2(t_embedding)
         t_embedding = t_embedding.reshape(x_t.shape[0], -1, 1, 1)
         t_embedding = t_embedding.repeat(1, 1, x_t.shape[2], x_t.shape[3])

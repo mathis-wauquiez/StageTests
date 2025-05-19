@@ -6,8 +6,8 @@ hydra:
     dir: outputs/${run_name}
 
 
-image_path: data/example_images/bricks.jpg
-mask_path: data/example_images/mask.png
+image_path: data/example_images/1.png
+mask_path: data/example_images/mask2.png
 viz: true
 
 seed: 42

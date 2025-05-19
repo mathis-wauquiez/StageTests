@@ -72,7 +72,7 @@ class InpaintingFlow(Flow):
         x_1 = self.to_natural_fn(x_1) if self.to_natural_fn else x_1
 
         if self.viz:
-            visualize(x_0, x_1, x_pred, ema=ema)
+            visualize(x_0, x_1, x_pred, ema=ema, dir=self.dir)
         
         # Log the PSNR
         psnr = _get_psnr(x_pred, x_1)
