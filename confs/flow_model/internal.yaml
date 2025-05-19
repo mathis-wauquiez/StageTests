@@ -1,0 +1,57 @@
+defaults:
+- base
+
+_target_: src.internal_flow.flow.InpaintingFlow
+
+viz: ${viz}
+ema_decay: 0.9995
+
+# The model used to parameterize the flow
+model:
+  _target_: src.internal_flow.model.Model
+  n_channels: 32
+  output_dim: 3
+  in_dim: 4 # 2*3 + 1
+# The configuration for the flow
+
+cfg:
+  _target_: src.flows.types.FlowConfig
+  predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
+  guidance: "CFG"  # or "classifier", "CFG"
+  guidance_scale: 1.0
+  guided_prob: 1.
+
+path:
+  _target_: src.flows.path.AffinePath 
+
+  scheduler:
+    _target_: src.flows.schedulers.OTScheduler  # or CosineScheduler
+
+optimizer_cfg:
+  _target_: torch.optim.Adam
+  _partial_: true     # ← important!
+  lr: 0.0001
+  weight_decay: 0.0001
+  betas: [0.9, 0.999]
+
+# scheduler_cfg:
+#   _target_: torch.optim.lr_scheduler.SequentialLR
+#   _partial_: true
+#   _recursive_: false
+
+#   schedulers:
+#     # 1️⃣ Linear warm‑up
+#     - _target_: torch.optim.lr_scheduler.LinearLR
+#       # _partial_: true
+#       total_iters: 100          # warm‑up steps
+#       start_factor: 0.01        # 1 % of base LR
+#       end_factor: 1.0
+
+#     # 2️⃣ Cosine decay
+#     - _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+#       # _partial_: true
+#       T_max: 900                # cosine length (after warm‑up)
+#       eta_min: 1.0e-6
+
+#   milestones: [100]             # switch from warm‑up to cosine
+#   last_epoch: -1

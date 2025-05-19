@@ -60,10 +60,10 @@ class UNet(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, n_channels=32):
+    def __init__(self, in_dim=4, n_channels=32, output_dim=3):
         self.time_dim = 16
         self.d = n_channels
-        self.output_dim = 12
+        self.output_dim = output_dim
 
         super().__init__()
 
@@ -73,7 +73,7 @@ class Model(nn.Module):
         # Feature extractor
         self.pre_features = nn.Sequential(
             # nn.Conv2d(3 + self.time_dim, self.d, 3, padding=1),
-            nn.Conv2d(4*3*2 + 1 + self.time_dim, self.d, 3, padding=1),
+            nn.Conv2d(in_dim + self.time_dim, self.d, 3, padding=1),
             nn.ReLU()
         )
 
@@ -85,14 +85,18 @@ class Model(nn.Module):
             nn.Conv2d(self.d, self.output_dim, 3, padding=1)
         )
 
-    def forward(self, x, y, mask, t):
+    def forward(self, t, x_t, y=None, cond_mask=None):
+
+        # y: mask
+        assert y is not None, "y must be provided"
+
         # Encode t and reshape it to image size
         t_embedding = self.time_encoder(t.to("cuda"))
         t_embedding = self.time_encoder2(t_embedding)
-        t_embedding = t_embedding.reshape(x.shape[0], -1, 1, 1)
-        t_embedding = t_embedding.repeat(1, 1, x.shape[2], x.shape[3])
+        t_embedding = t_embedding.reshape(x_t.shape[0], -1, 1, 1)
+        t_embedding = t_embedding.repeat(1, 1, x_t.shape[2], x_t.shape[3])
 
-        a = torch.cat([x, y, mask, t_embedding], dim=1)
+        a = torch.cat([x_t, y, t_embedding], dim=1)
 
         a = self.pre_features(a)
         a = self.conv_features(a)

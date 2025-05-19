@@ -1,0 +1,18 @@
+
+run_name: ${next_version:outputs}          # "v_0", "v_1", …
+
+hydra:
+  run:
+    dir: outputs/${run_name}
+
+
+image_path: data/example_images/bricks.jpg
+mask_path: data/example_images/mask.png
+viz: true
+
+seed: 42
+
+defaults:
+- flow_model: internal
+- trainer: internal
+- data: internal

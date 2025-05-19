@@ -14,7 +14,14 @@ loss_fn:
 # The configuration for the flow
 cfg:
   _target_: src.flows.types.FlowConfig
-  predicts: "x_0" # or "x_0", "score", "velocity", what the model predicts
+  predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
+
+solver_cfg: # configuration for torchdiffeq.odeint
+            # see https://github.com/rtqichen/torchdiffeq
+  method: "euler" # midpoint, euler, ...
+  n_steps: 100
+
+  # then, you can set the solver parameters, like rtol, atol, etc.
 
 
 optimizer_cfg:

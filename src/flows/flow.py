@@ -179,15 +179,15 @@ class Flow(LightningModule):
 
     def predict_x0(self, t: Tensor, x: Tensor, **kw) -> Tensor:
         net_out = self.model(t, x, **kw)
-        return self.path.convert_parameterization(t, x, net_out, self.predict, Predicts.X0)
+        return self.path.convert_parameterization(t, x, net_out, self.cfg.predicts, Predicts.X0)
 
     def predict_x1(self, t: Tensor, x: Tensor, **kw) -> Tensor:
         net_out = self.model(t, x, **kw)
-        return self.path.convert_parameterization(t, x, net_out, self.predict, Predicts.X1)
+        return self.path.convert_parameterization(t, x, net_out, self.cfg.predicts, Predicts.X1)
 
     def predict_score(self, t: Tensor, x: Tensor, **kw) -> Tensor:
         net_out = self.model(t, x, **kw)
-        return self.path.convert_parameterization(t, x, net_out, self.predict, Predicts.SCORE)
+        return self.path.convert_parameterization(t, x, net_out, self.cfg.predicts, Predicts.SCORE)
 
     def predict_v(self, t: Tensor, x: Tensor, **kw) -> Tensor:
         """ Predicts the conditional velocity field."""
@@ -216,6 +216,9 @@ class Flow(LightningModule):
         # Merge solver configurations
         solver_cfg = {"method": "midpoint", **self.solver_cfg, **solver_cfg}
 
+        if n_steps == 50 and "n_steps" in solver_cfg:
+            n_steps = solver_cfg.pop("n_steps")
+
         t_span = torch.linspace(0, 1, n_steps, device=x_0.device)
 
         if "method" not in solver_cfg:
@@ -239,7 +242,9 @@ class Flow(LightningModule):
         trajectory, _ = self.sample_trajectory(x_0, n_steps=n_steps, y=y, **solver_cfg)
         return trajectory[-1]
     
-    
+    def forward(self, *args, **kwargs) -> Tensor:
+        return self.sample(*args, **kwargs)
+
     # ------------------------------------------------------------------
     #  Training / validation
     # ------------------------------------------------------------------
@@ -300,44 +305,90 @@ class Flow(LightningModule):
         )
         self.log_dict({"val_loss": loss}, prog_bar=True, on_epoch=True)
         return loss
+    
+    def test_step(self, batch, batch_idx):
+        if len(batch) == 3:
+            x_0, x_1, y = batch
+        else:
+            x_0, x_1 = batch
+            y = None
+
+        t, x_t = self.path.sample(x_0, x_1)
+        loss = self._get_loss(x_0, x_1, t, x_t, y=y) if y is not None else self._get_loss(
+            x_0, x_1, t, x_t
+        )
+        self.log_dict({"test_loss": loss}, prog_bar=True, on_epoch=True)
+        return loss
 
     # ------------------------------------------------------------------
     #  Optimiser & scheduler
     # ------------------------------------------------------------------
 
     def configure_optimizers(self):
+        
+        # 1) optimizer
         opt_cfg = self.optimizer_cfg
-
-        # if Hydra saw `_partial_: true` it will have turned
-        # `opt_cfg` into a `functools.partial`, so just call it:
-        if isinstance(opt_cfg, partial) or callable(opt_cfg):
+        if isinstance(opt_cfg, (DictConfig, dict)):
+            optimizer = instantiate(opt_cfg, params=self.parameters())
+        else:                                 # already a partial or callable
             optimizer = opt_cfg(params=self.parameters())
 
-        # otherwise assume it’s a DictConfig or plain dict
-        # describing how to build the optimizer:
-        elif isinstance(opt_cfg, (DictConfig, dict)):
-            optimizer = instantiate(opt_cfg, params=self.parameters())
-
-        else:
-            raise TypeError(
-                f"optimizer_cfg must be a DictConfig/dict or a callable/partial, "
-                f"but got {type(opt_cfg)}"
-            )
-
-        # now do the same trick for the scheduler if you have one
-        if self.scheduler_cfg:
-            sched_cfg = self.scheduler_cfg
-            if isinstance(sched_cfg, partial) or callable(sched_cfg):
-                scheduler = sched_cfg(optimizer=optimizer)
-            else:
-                scheduler = instantiate(sched_cfg, optimizer=optimizer)
-            return {
-                "optimizer": optimizer,
-                "lr_scheduler": {
-                    "scheduler": scheduler,
-                    "interval": "step",
-                    "frequency": 1,
-                },
-            }
+        # 2) scheduler
+        # if self.scheduler_cfg is not None:
+        #     scheduler = _make_scheduler(self.scheduler_cfg, optimizer)
+        #     return {
+        #         "optimizer": optimizer,
+        #         "lr_scheduler": {
+        #             "scheduler": scheduler,
+        #             "interval": "step",
+        #             "frequency": 1,
+        #         },
+        #     }
+        return optimizer
 
         return optimizer
+    
+from functools import partial
+from typing import Any, Dict
+import torch.optim.lr_scheduler as lrs
+import hydra
+
+CONTAINER_TYPES = (
+    lrs.SequentialLR,          # warm-up → cosine, chained, etc.
+    lrs.ChainedScheduler,
+)
+
+
+def _make_scheduler(cfg, optimizer):
+    """
+    Instantiate *leaf* and *container* LR-schedulers, whether the config comes
+    in as a DictConfig/dict or a functools.partial.
+
+    • Leaf scheduler  – receives `optimizer` and is returned.
+    • Container       – children are built first, then passed in.
+    """
+    if isinstance(cfg, partial):
+        cls = cfg.func        # the actual scheduler class
+
+        if cls in CONTAINER_TYPES:
+            child_cfgs = cfg.keywords.pop("schedulers")
+            children = [_make_scheduler(c, optimizer) for c in child_cfgs]
+
+            # instantiate the container with the finished children
+            return cls(optimizer=optimizer, schedulers=children, **cfg.keywords)
+
+        return cfg(optimizer=optimizer)
+
+    if isinstance(cfg, (DictConfig, dict)):
+        target = cfg.get("_target_", "")
+        # map string class names to real classes for the container test
+        cls = hydra.utils.get_class(target)
+        if cls in CONTAINER_TYPES:
+            child_cfgs = cfg.pop("schedulers")
+            children = [_make_scheduler(c, optimizer) for c in child_cfgs]
+            return instantiate(
+                cfg, optimizer=optimizer, schedulers=children, _recursive_=False
+            )
+        return instantiate(cfg, optimizer=optimizer)
+
+    raise TypeError(f"Unsupported scheduler_cfg type: {type(cfg)}")

@@ -146,9 +146,9 @@ class GMM2GMM(Dataset):
 
 def get_first_example_dataset(num_samples):
     # Parameters
-    l = 1.5           # vertical offset
-    std_x = 0.15      # standard deviation along x
-    std_y = 0.05      # standard deviation along y
+    l = 2           # vertical offset
+    std_x = 0.75/3      # standard deviation along x
+    std_y = 0.2      # standard deviation along y
 
     # Utility: create rotated anisotropic covariance
     def make_anisotropic_cov(angle_deg, std_x, std_y):

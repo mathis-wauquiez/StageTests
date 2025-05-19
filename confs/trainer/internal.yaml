@@ -1,0 +1,34 @@
+defaults:
+  - base
+
+max_epochs: 30
+# precision: 16
+accumulate_grad_batches: 10
+
+gradient_clip_val: 1.0
+deterministic: true
+
+
+
+callbacks:
+  - _target_: pytorch_lightning.callbacks.TQDMProgressBar
+    refresh_rate: 10
+    leave: true
+
+  - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    dirpath: checkpoints/          # = outputs/v_n/checkpoints/…
+    every_n_train_steps: 100
+    filename: "{epoch:02d}-{step:04d}"
+    save_last: true
+
+  # - _target_: src.internal_flow.callbacks.SaveConfigAndMetrics
+  #   filename: run.yaml
+
+logger:
+  - _target_: pytorch_lightning.loggers.WandbLogger
+    project: "StageTests"
+    name: "monoimage"
+    save_dir: "wandb/"
+    log_model: true
+
+  

@@ -41,7 +41,7 @@ def scatter_points_with_velocity(x0, x1, x_t, target_vectors):
     plt.show()
 
 
-def animate_estimated_velocity(x0, x1, estimated_velocity, device="cuda"):
+def animate_estimated_velocity(x0, x1, estimated_velocity, device="cuda", N_t=100):
     # === Grid ===
     grid_size = 20
     x_vals = np.linspace(-3, 3, grid_size)
@@ -51,7 +51,7 @@ def animate_estimated_velocity(x0, x1, estimated_velocity, device="cuda"):
     XY_torch = torch.tensor(XY, dtype=torch.float32, device=device)  # (N, 2)
 
     # === Time steps ===
-    time_steps = torch.linspace(0, 1, 100, device=device)
+    # time_steps = torch.linspace(0, 1, 100, device=device)
 
     # === Figure setup ===
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -66,7 +66,7 @@ def animate_estimated_velocity(x0, x1, estimated_velocity, device="cuda"):
 
     # === Animation function ===
     def update(frame):
-        t = time_steps[frame]
+        t = torch.tensor(frame / N_t, dtype=torch.float32, device=device)  # (1,)
         t_tensor = t.expand(XY_torch.shape[0])  # (N,)
         v = estimated_velocity(t_tensor, XY_torch)  # (N, 2)
         v_cpu = v.detach().cpu().numpy()
@@ -76,7 +76,8 @@ def animate_estimated_velocity(x0, x1, estimated_velocity, device="cuda"):
         ax.set_title(f"Velocity Field at t = {t.item():.2f}")
         return quiver,
 
-    ani = FuncAnimation(fig, update, frames=100, interval=50)
+    ani = FuncAnimation(fig, update, frames=N_t, interval=50000// N_t, blit=True)
+    plt.tight_layout()
     plt.close(fig)  # Prevents double display in notebooks
     return ani
 
@@ -132,7 +133,7 @@ def animate_sampled_trajectories(
 
 def plot_trajectories_with_density(
     flow_model,
-    dataset,
+    loader: DataLoader,
     *,
     N=1_000,                 # nombre de particules visualisées
     # --- style du subplot 1 (trajectoires) ----
@@ -155,10 +156,9 @@ def plot_trajectories_with_density(
         t_grid: (n_steps,)
     """
     # 1) Charger un batch
-    loader = DataLoader(dataset, batch_size=N, shuffle=True)
     x0, x1, _ = next(iter(loader))
-    x0 = x0.to(flow_model.device)  # (N, 2)
-    x1 = x1.to(flow_model.device)  # (N, 2)
+    x0 = x0.to(flow_model.device)[:N]  # (N, 2)
+    x1 = x1.to(flow_model.device)[:N]  # (N, 2)
 
     # 2) Échantillonner les trajectoires
     traj, t_grid = flow_model.sample_trajectory(x0)         # (T, N, 2)

@@ -1,0 +1,37 @@
+# train_loader = torch.utils.data.DataLoader(
+#     train_dataset,
+#     batch_size=30,
+#     num_workers=0,
+#     pin_memory=True,
+# )
+
+# TrainOverride(
+#     image_path=image_path,
+#     mask_box=test_dataset.region_box,
+#     seed=seed
+# )
+
+
+train_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 20
+  num_workers: 0
+  pin_memory: true
+
+  dataset:
+    _target_: src.internal_flow.data.TrainOverride
+    image_path: ${image_path}
+    mask_path: ${mask_path}
+    seed: ${seed}
+
+test_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 1
+  num_workers: 0
+  pin_memory: true
+
+  dataset:
+    _target_: src.internal_flow.data.TestOverride
+    image_path: ${image_path}
+    mask_path: ${mask_path}
+    seed: ${seed}
