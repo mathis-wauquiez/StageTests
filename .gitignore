@@ -8,3 +8,7 @@ myenv.yaml
 .gitignore
 .gitignore
 /logs
+requirements_cleaned.txt
+myenv.yaml
+environment.yml
+clean.py
