@@ -160,9 +160,12 @@ class SingleImageTrainDataset(IterableDataset):
     files = ["diffuse.png", "normal.png", "roughness.png", "specular.png"]
     size = 20000 # one epoch = k iterations
 
-    def __init__(self, image_path, mask_path, region_size=(256, 256), seed=None):
+    def __init__(self, image_path, mask_path, region_size=(256, 256), seed=None, sigma=None):
 
         super().__init__()
+
+        self.sigma = sigma
+
         if seed is not None:
             np.random.seed(seed)
             torch.manual_seed(seed)
@@ -198,6 +201,11 @@ class SingleImageTrainDataset(IterableDataset):
         
         if corrupt:
             corr = corrupt_tensor(sample, mask_region)
+
+            if self.sigma is not None:
+                epsilon = torch.randn_like(corr)
+                corr = corr * (1 - self.sigma)**.5 + epsilon * (self.sigma)**.5 # Variance-preserving
+
             return corr, sample
         return sample
 

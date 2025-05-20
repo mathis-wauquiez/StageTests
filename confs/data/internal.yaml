@@ -9,6 +9,7 @@ train_loader:
     image_path: ${image_path}
     mask_path: ${mask_path}
     seed: ${seed}
+    sigma: 0 # % of noise inside the image, in terms of variance
 
 test_loader:
   _target_: torch.utils.data.DataLoader

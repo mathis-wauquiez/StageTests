@@ -1,0 +1,3 @@
+- image_path=data/example_images/1.png
+- mask_path=data/example_images/mask2.png
+- data.train_loader.dataset.sigma=0.2
