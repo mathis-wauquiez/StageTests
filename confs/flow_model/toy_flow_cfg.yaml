@@ -16,7 +16,7 @@ model:
 # The configuration for the flow
 cfg:
   _target_: src.flows.types.FlowConfig
-  predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
+  predicts: "velocity" # or "x_0", "score", "velocity", what the model predicts
   guidance: "CFG"  # or "classifier", "CFG"
   guidance_scale: 1.0
   guided_prob: 0.5

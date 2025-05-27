@@ -4,6 +4,14 @@ _target_: src.flows.flow.Flow
 path:
   _target_: src.flows.path.AffinePath 
 
+  tol: 0.0003
+  
+  t_law:
+    _target_: src.flows.snr_sampler.LogitNormal
+    loc: 0.0
+    scale: 1.0
+
+
   scheduler:
     _target_: src.flows.schedulers.OTScheduler  # or CosineScheduler
 
@@ -14,12 +22,14 @@ loss_fn:
 # The configuration for the flow
 cfg:
   _target_: src.flows.types.FlowConfig
-  predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
+  predicts: "velocity" # or "x_0", "score", "velocity", what the model predicts
 
 solver_cfg: # configuration for torchdiffeq.odeint
             # see https://github.com/rtqichen/torchdiffeq
-  method: "euler" # midpoint, euler, ...
-  n_steps: 100
+  
+  method: "midpoint" # midpoint, euler, ...
+  options:
+    step_size: 0.01
 
   # then, you can set the solver parameters, like rtol, atol, etc.
 

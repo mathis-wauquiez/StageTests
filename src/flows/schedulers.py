@@ -125,6 +125,31 @@ class CosineScheduler(Scheduler):
         return torch.tan(t * torch.pi / 2)
     
 
+
+class LinearVP(Scheduler):
+    """
+    X_t = sqrt(t) * X_1 + sqrt(1−t) * X_0
+    """
+
+    def alpha(self, t: Tensor) -> Tensor:
+        return torch.sqrt(t)
+
+    def alpha_dt(self, t: Tensor) -> Tensor:
+        return 0.5 * (t ** -0.5)
+
+    def sigma(self, t: Tensor) -> Tensor:
+        return torch.sqrt(1 - t)
+
+    def sigma_dt(self, t: Tensor) -> Tensor:
+        return -0.5 * (1 - t) ** -0.5
+    
+    def snr(self, t: Tensor) -> Tensor:
+        """
+        Returns the signal-to-noise ratio for the current timestep.
+        """
+        return torch.sqrt(t / (1 - t))
+
+
 class InterpolatedScheduler(Scheduler):
     """
     This scheduler uses a cubic spline to interpolate a DDPM VP scheduler.

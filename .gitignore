@@ -8,3 +8,9 @@ myenv.yaml
 .gitignore
 .gitignore
 /logs
+/models
+*.yml
+*.png
+*.pyc
+*.pyc
+/src/flows/__pycache__

@@ -59,7 +59,7 @@ def animate_estimated_velocity(x0, x1, estimated_velocity, device="cuda", N_t=10
 
     plt.scatter(x1[:, 0], x1[:, 1], color='orange', alpha=0.3, label='Target (GMM2)')
 
-    quiver = ax.quiver(X, Y, np.zeros_like(X), np.zeros_like(Y))
+    quiver = ax.quiver(X, Y, np.zeros_like(X)+1, np.zeros_like(Y)+1)
     ax.set_xlim(-3, 3)
     ax.set_ylim(-3, 3)
     ax.set_title("Estimated Velocity Field over Time")
@@ -109,7 +109,15 @@ def animate_sampled_trajectories(
     trajectories, t = flow_model.sample_trajectory(x0, y=y)  # (n_steps, N, D), (n_steps,)
     trajectories = trajectories.detach().cpu().numpy()
 
+    path_length = np.linalg.norm(
+        trajectories[-1] - trajectories[0], axis=-1
+    ).sum(axis=-1).mean()
+    print(f"Path length: {path_length:.4f}")
+
     fig, ax = plt.subplots()
+
+    ax.set_title(f"Sampled Trajectories ($\gamma$ = {path_length:.2f})")
+    
     lines = [ax.plot([], [], 'o')[0] for _ in range(N)]
 
     def init():

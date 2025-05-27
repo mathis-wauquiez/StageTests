@@ -214,7 +214,7 @@ class Flow(LightningModule):
         """Sample a trajectory by solving the ODE from t=0 to t=1 using torchdiffeq's odeint."""
         
         # Merge solver configurations
-        solver_cfg = {"method": "midpoint", **self.solver_cfg, **solver_cfg}
+        solver_cfg = OmegaConf.to_container(self.solver_cfg) | solver_cfg
 
         if n_steps == 50 and "n_steps" in solver_cfg:
             n_steps = solver_cfg.pop("n_steps")
@@ -223,9 +223,9 @@ class Flow(LightningModule):
 
         if "method" not in solver_cfg:
             solver_cfg["method"] = "midpoint"
+            solver_cfg['options'] = {'step_size': 1 / n_steps}
 
         velocity_field = lambda t, x: self.estimated_velocity(t, x, y=y)
-
 
         with torch.no_grad():
             trajectory = odeint(
@@ -237,11 +237,31 @@ class Flow(LightningModule):
         
         return trajectory, t_span
     
-    def sample(self, x_0: Tensor, *, n_steps: int = 50, y: Optional[Tensor] = None, **solver_cfg: Any) -> Tensor:
+    def sample(self, x_0: Tensor, *, y: Optional[Tensor] = None, **solver_cfg: Any) -> Tensor:
         """Sample a single final state by solving the ODE from t=0 to t=1."""
-        trajectory, _ = self.sample_trajectory(x_0, n_steps=n_steps, y=y, **solver_cfg)
-        return trajectory[-1]
+
+        # Merge solver configurations
+        solver_cfg = OmegaConf.to_container(self.solver_cfg) | solver_cfg
+
+
+        t_span = torch.Tensor([0, 1], device=x_0.device)
+
+        if "method" not in solver_cfg:  # default to dopri5 (adaptive step size)
+            solver_cfg["method"] = "dopri5"
+
+        velocity_field = lambda t, x: self.estimated_velocity(t, x, y=y)
+
+        with torch.no_grad():
+            trajectory = odeint(
+                velocity_field,
+                x_0,
+                t_span,
+                **solver_cfg
+            )
+        
+        return trajectory[-1, ...]
     
+
     def forward(self, *args, **kwargs) -> Tensor:
         return self.sample(*args, **kwargs)
 
