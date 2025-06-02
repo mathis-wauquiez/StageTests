@@ -5,9 +5,13 @@ hydra:
   run:
     dir: outputs/${run_name}
 
+  sweep:
+    dir: outputs/${run_name}
+    subdir: ${hydra.job.num}          # 0, 1, 2, …
 
-image_path: data/example_images/1.png
-mask_path: data/example_images/mask2.png
+
+image_path: data/example_images/2.png
+mask_path: data/example_images/mask3.png
 viz: true
 
 seed: 42

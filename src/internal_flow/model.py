@@ -60,10 +60,11 @@ class UNet(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, in_dim=4, n_channels=32, output_dim=3):
+    def __init__(self, in_dim=4, n_channels=32, output_dim=3, skip=False):
         self.time_dim = 16
         self.d = n_channels
         self.output_dim = output_dim
+        self.skip = skip
 
         super().__init__()
 
@@ -102,4 +103,4 @@ class Model(nn.Module):
         a = self.conv_features(a)
         a = self.post_features(a)
 
-        return a
+        return a if not self.skip else x_t + a

@@ -1,7 +1,7 @@
 defaults:
   - base
 
-max_epochs: 40
+max_epochs: 30
 precision: bf16-mixed
 accumulate_grad_batches: 8
 
@@ -9,9 +9,8 @@ gradient_clip_val: 1.0
 deterministic: true
 
 accelerator: gpu
-devices: auto
+devices: 3
 strategy: ddp
-
 
 
 callbacks:
@@ -20,18 +19,20 @@ callbacks:
     leave: true
 
   - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-    dirpath: checkpoints/          # = outputs/v_n/checkpoints/…
-    every_n_train_steps: 100
+    dirpath: ${hydra:run.dir}/checkpoints
+    every_n_train_steps: 1000
     filename: "{epoch:02d}-{step:04d}"
     save_last: true
 
-  # - _target_: src.internal_flow.callbacks.SaveConfigAndMetrics
-  #   filename: run.yaml
+  - _target_: src.internal_flow.callbacks.FullReportCallback
+    output_dir: ${hydra:run.dir}/reports
+    gif_name: evolution.gif
+
 
 logger:
   - _target_: pytorch_lightning.loggers.WandbLogger
-    project: "StageTests"
-    name: "monoimage"
+    project: InternalDiffusionProject_${run_name}
+    name: "OTScheduler_sigma_v"
     save_dir: "wandb/"
     log_model: true
 

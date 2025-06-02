@@ -4,6 +4,9 @@ lightning_logs/
 __pycache/*
 /checkpoints
 /outputs
+/outputs2
+/outputs_old
+/multirun
 myenv.yaml
 .gitignore
 .gitignore

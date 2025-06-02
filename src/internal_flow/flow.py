@@ -3,10 +3,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import lpips
-
-from .visualization import visualize
-
+from pathlib import Path
 from torch_ema import ExponentialMovingAverage
+from pytorch_msssim import ssim as _ssim_fn   # pip install pytorch-msssim
 
 _lpips_loss_fn = lpips.LPIPS(net='vgg')
 
@@ -30,82 +29,93 @@ def _get_lpips(x_pred, x_gt):
     return lpips_score.item()
 
 
+def _get_ssim(x_pred, x_gt, data_range=1.0):
+    """
+    Calculate the Structural Similarity Index (SSIM) between the predicted and
+    ground-truth images.
+
+    Args
+    ----
+    x_pred, x_gt : torch.Tensor
+        Image tensors shaped  (B, C, H, W) **or** (C, H, W) in the range [0, data_range].
+    data_range   : float
+        Dynamic range of the images. 1.0 if tensors are already in [0,1],
+        255 if they are uint-8 images converted to floats, etc.
+    Returns
+    -------
+    float
+        SSIM value averaged over the whole batch; 1 = perfect match.
+    """
+    # add batch dimension if the caller passed (C, H, W)
+    if x_pred.ndim == 3:
+        x_pred = x_pred.unsqueeze(0)
+        x_gt   = x_gt.unsqueeze(0)
+
+    # safety: clamp into the valid intensity range
+    x_pred = x_pred.clamp(0, data_range)
+    x_gt   = x_gt.clamp(0, data_range)
+
+    score = _ssim_fn(
+        x_pred,
+        x_gt,
+        data_range=data_range,
+        size_average=True
+    )
+
+    return score.item()
+
+
 class InpaintingFlow(Flow):
     """
     InpaintingFlow is a subclass of Flow that implements specific evaluation metrics for texture inpainting.
     """
 
-    def __init__(self, *args, **kwargs):
-
-        self.viz = kwargs.pop("viz", None)                     # Wether to visualize the results or not
-        self.to_natural_fn = kwargs.pop("to_natural_fn", None) # Function to convert to natural image
-        decay = kwargs.pop("ema_decay", 0.99)                     # EMA decay rate
+    def __init__(self, *args, ema_decay=0.99, to_natural_fn=None, **kwargs):
 
         super().__init__(*args, **kwargs)
-        
-        self.ema = ExponentialMovingAverage(self.parameters(), decay=decay)
+
+        self.to_natural = to_natural_fn 
+        self.ema = ExponentialMovingAverage(self.parameters(), decay=ema_decay)
         self.ema.update(self.parameters())                       # Initialize EMA
 
-    def step(self, batch, batch_idx, ema=False):
-
-        template = "test" if not ema else "ema_test"
-
-        if len(batch) == 3:
-            x_0, x_1, y = batch
-        else:
-            x_0, x_1 = batch
-            y = None
-
-        t, x_t = self.path.sample(x_0, x_1)
-        loss = self._get_loss(x_0, x_1, t, x_t, y=y) if y is not None else self._get_loss(
-            x_0, x_1, t, x_t
-        )
-
-        self.log_dict({f"{template}_loss": loss}, prog_bar=True, on_epoch=True)
-
-        x_pred = self.sample(x_0, y=y).cpu()
-        x_0 = x_0.cpu()
-        x_1 = x_1.cpu()
-
-        x_pred = self.to_natural_fn(x_pred) if self.to_natural_fn else x_pred
-        x_0 = self.to_natural_fn(x_0) if self.to_natural_fn else x_0
-        x_1 = self.to_natural_fn(x_1) if self.to_natural_fn else x_1
-
-        if self.viz:
-            visualize(x_0, x_1, x_pred, ema=ema, dir=self.dir)
-        
-        # Log the PSNR
-        psnr = _get_psnr(x_pred, x_1)
-        self.log_dict({f"{template}_psnr": psnr}, prog_bar=True, on_epoch=True)
-
-        # Log the LPIPS
-        lpips_loss = _get_lpips(x_pred, x_1)
-        self.log_dict({f"{template}_lpips": lpips_loss}, prog_bar=True, on_epoch=True)
-
+    def training_step(self, batch, batch_idx):
+        loss = super().training_step(batch, batch_idx)
+        self.ema.update(self.parameters())
         return loss
 
-
-    def test_step(self, batch, batch_idx):
-        """
-        Test step for the inpainting flow model.
-        """
-        self.eval()
-        self.step(batch, batch_idx, ema=False)
-
-        with self.ema.average_parameters():
-            self.ema.to(device=self.device)
-            self.step(batch, batch_idx, ema=True)
-
     def validation_step(self, batch, batch_idx):
-        return self.test_step(batch, batch_idx) # bad practice
+        x0, x1, *rest = batch
+        y = rest[0] if rest else None
+
+        # run the raw model
+        x_pred = self(x0, y=y)
+        # run the EMA model
+        with self.ema.average_parameters():
+            x_pred_ema = self(x0, y=y)
+
+        # optional conversion back to natural image range
+        if self.to_natural:
+            x_pred    = self.to_natural(x_pred)
+            x_pred_ema= self.to_natural(x_pred_ema)
+            x1         = self.to_natural(x1)
+            x0         = self.to_natural(x0)
+
+        # compute the batch loss one more time for val_loss logging
+        t, xt = self.path.sample(x0, x1)
+        val_loss = self._get_loss(x0, x1, t, xt, y=y)
+
+        return {
+            "val_loss":       val_loss,
+            "test_pred":      x_pred,
+            "test_gt":        x1,
+            "ema_test_pred":  x_pred_ema,
+            "ema_test_gt":    x1,
+            # we only need one sample for snapshots:
+            "x0":             x0
+        }
 
     # move the EMA to the correct device at the beginning of the training
     def on_fit_start(self):
+        super().on_fit_start()
         if self.ema:
             self.ema.to(device=self.device)
-
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-
-        if self.ema:
-            self.ema.update(self.parameters())

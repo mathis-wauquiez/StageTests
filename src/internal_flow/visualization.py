@@ -6,7 +6,7 @@ import itertools
 
 from pathlib import Path
 
-def visualize(x_0, x_1, x_pred, ema=False, dir=None):
+def visualize(x_0, x_1, x_pred, ema=False, dir=None, metrics=None):
     """
     Visualize the original and inpainted images.
     """
@@ -39,3 +39,10 @@ def visualize(x_0, x_1, x_pred, ema=False, dir=None):
     dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(f"{dir}/comparison_{i}{filename_ext}.png")
     plt.close(fig)
+
+    # if there are metrics, save them to a .yaml file
+    if metrics is not None:
+        metrics_filename = f"{dir}/metrics_{i}{filename_ext}.yaml"
+        with open(metrics_filename, "a") as f:
+            for key, value in metrics.items():
+                f.write(f"{key}: {value}\n")

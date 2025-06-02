@@ -128,12 +128,14 @@ class AffinePath(nn.Module):
         assert x_t.shape == f_A.shape, f"x_t and f_A must be the same shape, got {x_t.shape} and {f_A.shape}"
         assert t.dim() == 1, f"t must be a 1-D tensor, got {t.dim()} dimensions"
         
+        f_A = f_A.to(dtype=x_t.dtype) # to avoid issues with mixed precision
+
         source = Predicts.from_any(source_parameterization)
         target = Predicts.from_any(target_parameterization)
 
         
         self._check_valid_conversion(t, source_parameterization, target_parameterization)
-                
+
         t_0_mask = torch.isclose(t, torch.zeros_like(t), atol=self.tol)
         t_1_mask = torch.isclose(t, torch.ones_like(t), atol=self.tol)
 

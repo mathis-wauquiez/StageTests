@@ -1,7 +1,7 @@
 train_loader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 240
-  num_workers: 8
+  batch_size: 64
+  num_workers: 12
   pin_memory: true
 
   dataset:
@@ -9,7 +9,7 @@ train_loader:
     image_path: ${image_path}
     mask_path: ${mask_path}
     seed: ${seed}
-    sigma: 0 # % of noise inside the image, in terms of variance
+    sigma: 0.1 # % of noise inside the image, in terms of variance
 
 test_loader:
   _target_: torch.utils.data.DataLoader
@@ -22,3 +22,4 @@ test_loader:
     image_path: ${image_path}
     mask_path: ${mask_path}
     seed: ${seed}
+    sigma: 0.1 # % of noise inside the image, in terms of variance

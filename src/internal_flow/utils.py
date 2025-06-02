@@ -33,13 +33,13 @@ def get_mask(image_path):
     done.wait()
     return result["mask"]
 
-def next_version_dir(base="outputs"):
+def next_version_dir(base="outputs2"):
     base = pathlib.Path(base)
     for i in itertools.count():
         if not (base / f"v_{i}").exists():
             return f"v_{i}"
 
-def current_version_dir(base="outputs"):
+def current_version_dir(base="outputs2"):
     base = pathlib.Path(base)
     for i in itertools.count():
         if not (base / f"v_{i+1}").exists():

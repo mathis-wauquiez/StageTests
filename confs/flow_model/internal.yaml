@@ -3,29 +3,42 @@ defaults:
 
 _target_: src.internal_flow.flow.InpaintingFlow
 
-viz: ${viz}
-ema_decay: 0.9999
+ema_decay: 0.999975
 
 # The model used to parameterize the flow
 model:
   _target_: src.internal_flow.model.Model
-  n_channels: 32
+  n_channels: 128
   output_dim: 3
   in_dim: 4 # 2*3 + 1
+  skip: false
 # The configuration for the flow
 
 cfg:
   _target_: src.flows.types.FlowConfig
-  predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
-  guidance: "CFG"  # or "classifier", "CFG"
-  guidance_scale: 1.0
-  guided_prob: 1.
+  predicts: velocity # or "x_0", "score", "velocity", what the model predicts
+  guidance: none
+
+solver_cfg: # configuration for torchdiffeq.odeint
+            # see https://github.com/rtqichen/torchdiffeq
+  
+  method: "dopri5" # midpoint, euler, ...
+  atol: 1e-6
+  rtol: 1e-6
+
 
 path:
   _target_: src.flows.path.AffinePath 
-
   scheduler:
-    _target_: src.flows.schedulers.OTScheduler  # or CosineScheduler
+    _target_: src.flows.schedulers.CosineScheduler  # or CosineScheduler
+  t_law:
+    _target_: src.flows.snr_sampler.LogitNormal
+    loc: 0.0
+    scale: 1.0
+
+  tol: 0.00001
+
+pass_y: true
 
 optimizer_cfg:
   _target_: torch.optim.Adam
@@ -34,24 +47,24 @@ optimizer_cfg:
   weight_decay: 0.0001
   betas: [0.9, 0.999]
 
-# scheduler_cfg:
-#   _target_: torch.optim.lr_scheduler.SequentialLR
-#   _partial_: true
-#   _recursive_: false
+scheduler_cfg:
+  _target_: torch.optim.lr_scheduler.SequentialLR
+  _partial_: true
+  _recursive_: false
 
-#   schedulers:
-#     # 1️⃣ Linear warm‑up
-#     - _target_: torch.optim.lr_scheduler.LinearLR
-#       # _partial_: true
-#       total_iters: 100          # warm‑up steps
-#       start_factor: 0.01        # 1 % of base LR
-#       end_factor: 1.0
+  schedulers:
+    # 1️⃣ Linear warm‑up
+    - _target_: torch.optim.lr_scheduler.LinearLR
+      # _partial_: true
+      total_iters: 100          # warm‑up steps
+      start_factor: 0.01        # 1 % of base LR
+      end_factor: 1.0
 
-#     # 2️⃣ Cosine decay
-#     - _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-#       # _partial_: true
-#       T_max: 900                # cosine length (after warm‑up)
-#       eta_min: 1.0e-6
+    # 2️⃣ Cosine decay
+    - _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+      # _partial_: true
+      T_max: 900                # cosine length (after warm‑up)
+      eta_min: 1.0e-6
 
-#   milestones: [100]             # switch from warm‑up to cosine
-#   last_epoch: -1
+  milestones: [100]             # switch from warm‑up to cosine
+  last_epoch: -1

@@ -5,6 +5,7 @@ import torch.nn as nn
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from hydra.utils import instantiate
+from hydra.core.hydra_config import HydraConfig
 
 import sys
 import os
@@ -28,9 +29,6 @@ def train_model(cfg: DictConfig):
         cfg (DictConfig): Configuration object containing training parameters.
     """
 
-    dir = next_version_dir()
-    output_dir = Path("outputs") / dir
-
     train_loader = instantiate(cfg.data.train_loader)
     test_loader = instantiate(cfg.data.test_loader)
 
@@ -39,15 +37,12 @@ def train_model(cfg: DictConfig):
     cfg.flow_model.optimizer_cfg.lr = lr
 
     flow_model = instantiate(cfg.flow_model, to_natural_fn=train_loader.dataset.to_natural)
-    flow_model.dir = output_dir
     trainer = instantiate(cfg.trainer)
-
-    
 
     trainer.fit(flow_model, train_loader, test_loader)
     trainer.test(flow_model, test_loader)
 
-    
+    output_dir = Path(HydraConfig.get().runtime.output_dir)
     torch.save(flow_model.state_dict(), output_dir / "model.pth")
     print(f"Model saved to {output_dir / 'model.pth'}")
 

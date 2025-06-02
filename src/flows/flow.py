@@ -31,7 +31,6 @@ class Flow(LightningModule):
 
     def __init__(
         self,
-        *,
         path: AffinePath,
         loss_fn: nn.Module,
         model: ModelWrapper,
@@ -40,9 +39,10 @@ class Flow(LightningModule):
         optimizer_cfg: Optional[dict] = None,
         scheduler_cfg: Optional[dict] = None,
         solver_cfg: Optional[dict] = None,
+        pass_y: Optional[bool] = False
     ) -> None:
         """
-        Time‑continuous flow model with optional guidance.
+        Time‑continuous flow model with optional guidance, trained using Flow Matching.
 
         Parameters
         ----------
@@ -63,31 +63,30 @@ class Flow(LightningModule):
         super().__init__()
 
         # --------------------------- sanity checks ---------------------------
-        
-        guidance = cfg.guidance
-        
-        if guidance == Guidance.CLASSIFIER and classifier is None:
-            raise ValueError("Classifier guidance requested but no classifier provided.")
-        if guidance == Guidance.CFG and classifier is not None:
-            raise ValueError("Cannot mix Classifier‑Free Guidance with an explicit classifier.")
+
+        if cfg.guidance == Guidance.CLASSIFIER and classifier is None:
+            raise ValueError("Classifier guidance requires a classifier.")
+        if cfg.guidance == Guidance.CFG and classifier is not None:
+            raise ValueError("Cannot combine CFG with explicit classifier.")
 
         # --------------------------- members ---------------------------
+        
         self.path = path
-        self.model = torch.compile(model) if cfg.compile else model
-        self.loss_fn = loss_fn
         self.cfg = cfg
-        self.classifier = classifier.to(self.device).eval() if classifier else None
-        if classifier:
-            for p in classifier.parameters():
-                p.requires_grad = False
+        self.device_auto = None
+        self._compile = cfg.compile
 
+        self.model = model
+        self.loss_fn = loss_fn
+        self.classifier = classifier
+        self.pass_y = pass_y
 
         self.optimizer_cfg = optimizer_cfg or {}
         self.scheduler_cfg = scheduler_cfg or {}
         self.solver_cfg: Dict[str, Any] = solver_cfg or {}
 
         # --------------------------- hparams snapshot ---------------------------
-        self.save_hyperparameters(ignore=["model", "classifier"])
+        # self.save_hyperparameters(ignore=["model", "classifier"])
 
 
     # ------------------------------------------------------------------
@@ -96,6 +95,20 @@ class Flow(LightningModule):
 
     def estimated_velocity(self, t, x, y=None, **kwargs):
         """Network‑based estimate of the true velocity ``v_θ(t,x_t)``."""
+
+        # High-level overview:
+        # 1. If we are using guidance, we need to
+        #    - get the outputs from the model with and without conditioning
+        #    - convert the outputs to the score function
+        #    - apply the guidance formula to get the final score estimation
+        #    - convert the score to the velocity field
+        # 2. If we are using classifier guidance, we need to
+        #    - get the outputs from the model and convert them to the score function
+        #    - compute the classifier log_p gradient
+        #    - apply the guidance formula to get the final velocity estimation
+        # 3. If no guidance is used or that y is None, we simply
+        #    - get the outputs from the model and convert them to the velocity field.
+
 
         # Torchdiffeq passes scalars → make them batch tensors
         t = _to_tensor_scalar(t)    
@@ -114,15 +127,15 @@ class Flow(LightningModule):
             cond_mask = torch.tensor([1, 0], device=x.device, dtype=torch.bool).repeat_interleave(
                 x.shape[0]
             )
-            out = self.model(t_cat, x_cat, cond_mask=cond_mask, y=y_cat, **kwargs)
+            net_out = self.model(t_cat, x_cat, cond_mask=cond_mask, y=y_cat, **kwargs)
 
             # Convert to score
-            out = self.path.convert_parameterization(
-                t_cat, x_cat, out, source_parameterization, Predicts.SCORE
+            scores = self.path.convert_parameterization(
+                t_cat, x_cat, net_out, source_parameterization, Predicts.SCORE
             )
 
             # Apply guidance
-            cond, uncond = out.chunk(2)
+            cond, uncond = scores.chunk(2)
             outputs = uncond + self.cfg.guidance_scale * (cond - uncond)
             source_parameterization = Predicts.SCORE
 
@@ -148,22 +161,18 @@ class Flow(LightningModule):
 
 
             # eq 4.90 p.34
-
-            outputs = self.path.convert_parameterization(
-                t,
-                x,
-                f_A=score + self.cfg.guidance_scale * grad_x,
-                source_parameterization=Predicts.SCORE,
-                target_parameterization=Predicts.VELOCITY,
-            )
-
-            source_parameterization = Predicts.VELOCITY
+            outputs = score + self.cfg.guidance_scale * grad_x
+            source_parameterization = Predicts.SCORE
         # ---------------------------------------------------------------- none
         else:
-            if self.cfg.guidance == Guidance.CFG: # y is None and CFG is requested
+            if self.cfg.guidance == Guidance.CFG: # y is None and CFG is used, we fall back to unconditional
                 y = torch.zeros(x.shape[0], device=x.device, dtype=torch.long)
                 cond_mask = torch.zeros(x.shape[0], device=x.device, dtype=torch.bool)
                 kwargs.update({"y": y, "cond_mask": cond_mask})
+
+            if self.pass_y:
+                # If `pass_y` is True, we pass `y` to the model anyway
+                kwargs.update({"y": y})
 
             # No guidance
             outputs = self.model(t, x, **kwargs)
@@ -206,24 +215,24 @@ class Flow(LightningModule):
     def sample_trajectory(
         self,
         x_0: Tensor,
-        *,
-        n_steps: int = 50,
+        t_span: Optional[Tensor] = None,
+        n_steps: Optional[int] = None,
         y: Optional[Tensor] = None,
         **solver_cfg: Any,
     ) -> tuple[Tensor, Tensor]:
         """Sample a trajectory by solving the ODE from t=0 to t=1 using torchdiffeq's odeint."""
-        
-        # Merge solver configurations
-        solver_cfg = OmegaConf.to_container(self.solver_cfg) | solver_cfg
 
-        if n_steps == 50 and "n_steps" in solver_cfg:
-            n_steps = solver_cfg.pop("n_steps")
+        assert t_span or n_steps, "Either `t_span` or `n_steps` must be provided."
 
-        t_span = torch.linspace(0, 1, n_steps, device=x_0.device)
+        if y is None and self.pass_y:
+            raise ValueError("`y` must be provided if `pass_y` is True.")
 
-        if "method" not in solver_cfg:
-            solver_cfg["method"] = "midpoint"
-            solver_cfg['options'] = {'step_size': 1 / n_steps}
+        # If t_span is not provided, create it
+        if n_steps is not None and t_span is None:
+            t_span = torch.linspace(0, 1, n_steps, device=x_0.device)
+
+        # Merge solver configurations - if no method is provided, default to 'dopri5'
+        solver_cfg = {'method':'dopri5'} | self._merge_config(solver_cfg)
 
         velocity_field = lambda t, x: self.estimated_velocity(t, x, y=y)
 
@@ -235,22 +244,21 @@ class Flow(LightningModule):
                 **solver_cfg
             )
         
-        return trajectory, t_span
+        return trajectory
     
     def sample(self, x_0: Tensor, *, y: Optional[Tensor] = None, **solver_cfg: Any) -> Tensor:
         """Sample a single final state by solving the ODE from t=0 to t=1."""
 
-        # Merge solver configurations
-        solver_cfg = OmegaConf.to_container(self.solver_cfg) | solver_cfg
+        if y is None and self.pass_y:
+            raise ValueError("`y` must be provided if `pass_y` is True.")
 
+        t_span = torch.tensor([0., 1.], device=x_0.device)
+        solver_cfg = {'method':'dopri5'} | self._merge_config(solver_cfg)
 
-        t_span = torch.Tensor([0, 1], device=x_0.device)
-
-        if "method" not in solver_cfg:  # default to dopri5 (adaptive step size)
-            solver_cfg["method"] = "dopri5"
-
+        # Condition the velocity field on `y` if provided
         velocity_field = lambda t, x: self.estimated_velocity(t, x, y=y)
 
+        # Solve the ODE
         with torch.no_grad():
             trajectory = odeint(
                 velocity_field,
@@ -259,7 +267,7 @@ class Flow(LightningModule):
                 **solver_cfg
             )
         
-        return trajectory[-1, ...]
+        return trajectory[-1, ...] # Trajectory is of shape (2, BS, ...)
     
 
     def forward(self, *args, **kwargs) -> Tensor:
@@ -270,10 +278,22 @@ class Flow(LightningModule):
     # ------------------------------------------------------------------
 
     def _get_loss(self, x_0: Tensor, x_1: Tensor, t: Tensor, x_t: Tensor, **kwargs) -> Tensor:
+        """ Compute the loss for the given inputs. """
+
+        # There are two cases me might want to consider:
+        # 1. We want to define the loss wrt to the model prediction of x_0, x_1, v or score.
+        # 2. We want to define the loss wrt to the prediction of the velocity field.
+        # We might also want to add a time coefficient to the loss, which has been shown to improve the results in some cases.
+
         
         if self.cfg.guidance == Guidance.CFG:
             random_mask = torch.rand(x_0.shape[0], device=x_0.device) < self.cfg.guided_prob
             kwargs.update({'cond_mask': random_mask})
+
+        outputs = self.model(t, x_t, **kwargs)
+        v_theta = self.path.convert_parameterization(t, x_t, outputs, self.cfg.predicts, Predicts.VELOCITY)
+        v_target = self.path.target_velocity(t, x_0, x_1)
+        return self.loss_fn(v_theta, v_target)
 
         if self.cfg.predicts == Predicts.X0:
             return self.loss_fn(self.model(t, x_t, **kwargs), x_0)
@@ -296,49 +316,61 @@ class Flow(LightningModule):
     #  Basic Lightning Hooks
     # ------------------------------------------------------------------
 
-    def training_step(self, batch, batch_idx):
+    def _step(self, batch, batch_idx):
+        """
+        Perform a single training/validation/test step to get the loss.
+        This is really the default function, and of course validation_step and test_step can be overridden
+        """
+
         if len(batch) == 3:
             x_0, x_1, y = batch
         else:
             x_0, x_1 = batch
             y = None
 
-        pass_y = y if self.cfg.guidance in (Guidance.CFG, Guidance.CLASSIFIER) else None
+        t, x_t = self.path.sample(x_0, x_1) # Sample a random point and time
 
-        t, x_t = self.path.sample(x_0, x_1)
-        loss = self._get_loss(x_0, x_1, t, x_t, y=y) if pass_y is not None else self._get_loss(
-            x_0, x_1, t, x_t
-        )
+        if self.cfg.guidance in (Guidance.CFG, Guidance.CLASSIFIER) or self.pass_y:
+            if y is None and self.cfg.guidance != Guidance.CLASSIFIER:
+                raise ValueError("`y` must be provided if `pass_y` is True or classifier-free guidance is used.")
+            return self._get_loss(x_0, x_1, t, x_t, y=y)
+
+        return self._get_loss(x_0, x_1, t, x_t)
+
+        
+    def training_step(self, batch, batch_idx):
+        loss = self._step(batch, batch_idx)
         self.log_dict({"train_loss": loss}, prog_bar=True, on_step=True, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        if len(batch) == 3:
-            x_0, x_1, y = batch
-        else:
-            x_0, x_1 = batch
-            y = None
-
-        t, x_t = self.path.sample(x_0, x_1)
-        loss = self._get_loss(x_0, x_1, t, x_t, y=y) if y is not None else self._get_loss(
-            x_0, x_1, t, x_t
-        )
+        loss = self._step(batch, batch_idx)
         self.log_dict({"val_loss": loss}, prog_bar=True, on_epoch=True)
         return loss
     
     def test_step(self, batch, batch_idx):
-        if len(batch) == 3:
-            x_0, x_1, y = batch
-        else:
-            x_0, x_1 = batch
-            y = None
-
-        t, x_t = self.path.sample(x_0, x_1)
-        loss = self._get_loss(x_0, x_1, t, x_t, y=y) if y is not None else self._get_loss(
-            x_0, x_1, t, x_t
-        )
+        loss = self._step(batch, batch_idx)
         self.log_dict({"test_loss": loss}, prog_bar=True, on_epoch=True)
         return loss
+
+
+    def on_fit_start(self) -> None:
+        # Move and compile after device is known
+        self.model = self.model.to(self.device)
+        if self._compile:
+            self.model = torch.compile(self.model)
+        if self.classifier:
+            self.classifier = self.classifier.to(self.device).eval()
+            for p in self.classifier.parameters():
+                p.requires_grad = False
+
+    def on_train_epoch_start(self) -> None:
+        self.path._tol = self.path.tol
+        self.path.tol = 0
+
+    def on_train_epoch_end(self) -> None:
+        self.path.tol = self.path._tol
+
 
     # ------------------------------------------------------------------
     #  Optimiser & scheduler
@@ -354,20 +386,34 @@ class Flow(LightningModule):
             optimizer = opt_cfg(params=self.parameters())
 
         # 2) scheduler
-        # if self.scheduler_cfg is not None:
-        #     scheduler = _make_scheduler(self.scheduler_cfg, optimizer)
-        #     return {
-        #         "optimizer": optimizer,
-        #         "lr_scheduler": {
-        #             "scheduler": scheduler,
-        #             "interval": "step",
-        #             "frequency": 1,
-        #         },
-        #     }
+        if self.scheduler_cfg:
+            scheduler = _make_scheduler(self.scheduler_cfg, optimizer)
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "interval": "step",
+                    "frequency": 1,
+                },
+            }
         return optimizer
 
-        return optimizer
-    
+    # ------------------------------------------------------------------
+    #  Class helpers
+    # ------------------------------------------------------------------
+
+    def _merge_config(self, cfg: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        """Merge the provided config with the flow's solver config."""
+        merged_cfg = OmegaConf.to_container(self.solver_cfg) | cfg | kwargs
+        return merged_cfg
+
+
+
+
+# -----------------------------------------------------------------------------
+#  Helper functions for LR-schedulers
+# -----------------------------------------------------------------------------
+
 from functools import partial
 from typing import Any, Dict
 import torch.optim.lr_scheduler as lrs

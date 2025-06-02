@@ -158,7 +158,7 @@ class SingleImageTrainDataset(IterableDataset):
     """Infinite train dataset returning (corrupt, clean, mask) tuples."""
 
     files = ["diffuse.png", "normal.png", "roughness.png", "specular.png"]
-    size = 20000 # one epoch = k iterations
+    size = 50000 # one epoch = k iterations
 
     def __init__(self, image_path, mask_path, region_size=(256, 256), seed=None, sigma=None):
 
@@ -240,8 +240,8 @@ class SingleImageTrainDataset(IterableDataset):
 class SingleImageTestDataset(SingleImageTrainDataset):
     """Single‑sample dataset for evaluation."""
 
-    def __init__(self, image_path, mask_path, region_size=(256, 256), seed=None):
-        super().__init__(image_path, mask_path, region_size, seed=seed)
+    def __init__(self, image_path, mask_path, region_size=(256, 256), seed=None, sigma=None):
+        super().__init__(image_path, mask_path, region_size, seed=seed, sigma=sigma)
         
 
         # Load the mask and convert to grayscale (alpha channel -> grayscale)
