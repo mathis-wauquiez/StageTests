@@ -18,7 +18,7 @@ from src.internal_flow.flow import InpaintingFlow
 from src.internal_flow.utils import next_version_dir, current_version_dir
 # register as ${next_version:outputs}
 OmegaConf.register_new_resolver("next_version", next_version_dir)
-
+OmegaConf.register_new_resolver("sanitize", lambda s: str(Path(s)).replace("/", "_"))
 
 @hydra.main(config_path="confs", config_name="config", version_base=None)
 def train_model(cfg: DictConfig):
@@ -33,11 +33,15 @@ def train_model(cfg: DictConfig):
     test_loader = instantiate(cfg.data.test_loader)
 
     effective_batch_size = cfg.data.train_loader.batch_size * cfg.trainer.accumulate_grad_batches
-    lr = 1e-4 * effective_batch_size / 512
-    cfg.flow_model.optimizer_cfg.lr = lr
+    # lr = 1e-4 * effective_batch_size / 512
+    # cfg.flow_model.optimizer_cfg.lr = lr
 
     flow_model = instantiate(cfg.flow_model, to_natural_fn=train_loader.dataset.to_natural)
     trainer = instantiate(cfg.trainer)
+
+    for callback in trainer.callbacks:
+        callback.cfg = cfg
+
 
     trainer.fit(flow_model, train_loader, test_loader)
     trainer.test(flow_model, test_loader)

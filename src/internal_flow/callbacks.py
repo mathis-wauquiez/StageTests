@@ -4,12 +4,12 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning import Trainer, LightningModule
-from torchmetrics import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 import lpips
 import imageio
 import matplotlib.pyplot as plt
 from datetime import datetime
 from hydra.core.hydra_config import HydraConfig
+import torchvision as tv
 
 # -----------------------------------------------------------------------------
 # Utility helpers
@@ -57,27 +57,27 @@ class FullReportCallback(Callback):
     * Show Hydra overrides in the report.
     """
 
-    # shared LPIPS model (re‑used across callback instances)
-    _shared_lpips = None
+
+    def _make_subdir(self, path: Path):
+        """Create a subdirectory at the given path, if it does not exist."""
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
     def __init__(self, output_dir: str | None = None, gif_name: str = "evolution.gif"):
         super().__init__()
         run_dir = output_dir or HydraConfig.get().runtime.output_dir
-        self.out = Path(run_dir) / "reports"
+        self.out = Path(run_dir)
         self.out.mkdir(parents=True, exist_ok=True)
-        self.val_samples_dir = self.out / "val_samples"
-        self.val_samples_dir.mkdir(parents=True, exist_ok=True)
+        self.metrics_dir = self._make_subdir(self.out / "metrics")
+        self.losses_dir = self._make_subdir(self.out / "losses")
+        self.val_samples_dir = self._make_subdir(self.out / "val_samples")
+        self.last_val_samples_dir = self._make_subdir(self.out / "samples")
+
         self.gif_name = gif_name
 
         # Hydra overrides (key=value strings)
         self.overrides: list[str] = sorted(HydraConfig.get().overrides.task)
 
-        # metric modules (LPIPS reused)
-        self.psnr = PeakSignalNoiseRatio(data_range=1.0)
-        self.ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
-        if FullReportCallback._shared_lpips is None:
-            FullReportCallback._shared_lpips = lpips.LPIPS(net="vgg").eval()
-        self.lpips = FullReportCallback._shared_lpips
 
         # history (store only paths for images)
         self.history = {
@@ -95,24 +95,19 @@ class FullReportCallback(Callback):
 
     def on_fit_start(self, trainer, pl_module):
         device = pl_module.device
-        self.psnr.to(device)
-        self.ssim.to(device)
-        self.lpips.to(device)
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
-        loss = outputs.get('loss') if isinstance(outputs, dict) else outputs
-        if isinstance(loss, torch.Tensor):
-            self._train_batch_losses.append(loss.item())
-        elif isinstance(loss, (int, float)):
-            self._train_batch_losses.append(float(loss))
+        hydra_cfg = HydraConfig.get()        
+        # save Hydra config file
+        config_path = self.out / "config.yaml"
+        with open(config_path, "w") as f:
+            OmegaConf.save(self.cfg, f)
 
-    def on_train_epoch_end(self, trainer, pl_module):
-        epoch = trainer.current_epoch
-        if self._train_batch_losses:
-            avg = float(np.mean(self._train_batch_losses))
-            self.history['train_loss'].append((epoch, avg))
-            np.save(self.out / 'loss_train.npy', np.array([v for _, v in self.history['train_loss']], dtype=float))
-            self._train_batch_losses.clear()
+        print(OmegaConf.to_yaml(self.cfg))
+
+        hydra_config_path = self.out / "hydra_config.yaml"
+        with open(hydra_config_path, "w") as f:
+            OmegaConf.save(hydra_cfg, f)
+
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
         if isinstance(outputs, dict):
@@ -123,38 +118,30 @@ class FullReportCallback(Callback):
         epoch = trainer.current_epoch
         outs = self._val_outputs
 
-        # --- aggregate val loss
-        val_losses = [o['val_loss'].item() for o in outs if 'val_loss' in o]
-        if val_losses:
-            avg_val = float(np.mean(val_losses))
-            self.history['val_loss'].append((epoch, avg_val))
-            np.save(self.out / 'loss_val.npy', np.array([v for _, v in self.history['val_loss']], dtype=float))
-
         # --- metrics + sample images per tag
-        device = next(self.lpips.parameters()).device
+        device = pl_module.device
+        gts   = torch.cat([o["test_gt"]   for o in outs], dim=0)
+
         for tag in ('test', 'ema_test'):
             if not all(f"{tag}_pred" in o for o in outs):
                 continue
-            preds = torch.cat([o[f"{tag}_pred"] for o in outs], dim=0).to(device)
-            gts   = torch.cat([o[f"{tag}_gt"]   for o in outs], dim=0).to(device)
-            with torch.no_grad():
-                ps = float(self.psnr(preds, gts).item())
-                ss = float(self.ssim(preds, gts).item())
-                lp = float(self.lpips(preds, gts).mean().item())
-            self.history['val_metrics'].append({'epoch': epoch, 'tag': tag, 'psnr': ps, 'ssim': ss, 'lpips': lp})
-            np.save(self.out / f"metrics_{tag}_epoch{epoch}.npy", np.array([ps, ss, lp], dtype=float))
+            preds = torch.cat([o[f"{tag}_pred"] for o in outs], dim=0)            
+            make_grid = lambda x: tv.utils.make_grid(
+                x[:9].cpu(),
+                nrow=3, normalize=False, padding=10, value_range=(0, 1)
+            )
 
             # ---- save combined sample image (GT | Pred) to disk only
-            gt_img   = gts[0].cpu().permute(1, 2, 0).numpy()
-            pred_img = preds[0].cpu().permute(1, 2, 0).numpy()
-            comb = np.concatenate([gt_img, pred_img], axis=1)
+            comb = torch.cat([gts[0:1], preds], dim=0)
+            grid = make_grid(comb)
             tag_dir = self.val_samples_dir / tag
             tag_dir.mkdir(exist_ok=True)
             img_path = tag_dir / f'epoch{epoch}.png'
-            plt.imsave(img_path, comb, dpi=200)
+            
+            tv.utils.save_image(grid, img_path)
             # overwrite latest shortcut
             latest_path = self.out / f'val_sample_{tag}_last.png'
-            plt.imsave(latest_path, comb, dpi=200)
+            tv.utils.save_image(grid, latest_path)
 
             # keep only path in memory
             self.history['images'].append({'epoch': epoch, 'tag': tag, 'path': str(img_path)})
@@ -164,15 +151,13 @@ class FullReportCallback(Callback):
 
     def on_train_end(self, trainer, pl_module):
         pdf_path = self.out / 'training_report.pdf'
-        run_name = Path(HydraConfig.get().runtime.output_dir).name
+        run_name = self.out.name
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         last_epoch = max((e for e, _ in self.history['train_loss']), default=None)
         from matplotlib.backends.backend_pdf import PdfPages
         with PdfPages(pdf_path) as pdf:
             self._add_title(pdf, run_name, ts)
             self._plot_overrides(pdf)
-            self._plot_loss(pdf)
-            self._plot_metrics(pdf)
             if last_epoch is not None:
                 self._plot_last_images(pdf, last_epoch)
         self._make_gif()
@@ -198,36 +183,6 @@ class FullReportCallback(Callback):
         tbl.set_fontsize(10)
         pdf.savefig(fig, dpi=300)
         plt.close(fig)
-
-    def _plot_loss(self, pdf):
-        fig, ax = plt.subplots()
-        for label, series in (("train", self.history["train_loss"]), ("val", self.history["val_loss"])):
-            if series:
-                epochs, vals = zip(*series)
-                ax.plot(epochs, vals, marker="o", label=f"{label} loss")
-        ax.set(title="Loss by Epoch", xlabel="Epoch", ylabel="Loss")
-        ax.legend()
-        pdf.savefig(fig, dpi=300)
-        plt.close(fig)
-
-    def _plot_metrics(self, pdf):
-        metric_names = ["psnr", "ssim", "lpips"]
-        tags = sorted({m["tag"] for m in self.history["val_metrics"]})
-        for m in metric_names:
-            fig, ax = plt.subplots()
-            for tag in tags:
-                recs = [r for r in self.history["val_metrics"] if r["tag"] == tag]
-                if recs:
-                    epochs = [r["epoch"] for r in recs]
-                    vals = [r[m] for r in recs]
-                    ax.plot(epochs, vals, marker="o", label=f"{tag} {m.upper()}")
-                    # annotate best/worst
-                    idx = int(np.argmax(vals) if m != "lpips" else np.argmin(vals))
-                    ax.annotate(f"{vals[idx]:.3f}", (epochs[idx], vals[idx]), textcoords="offset points", xytext=(0, 5))
-            ax.set(title=f"{m.upper()} by Epoch", xlabel="Epoch", ylabel=m.upper())
-            ax.legend()
-            pdf.savefig(fig, dpi=300)
-            plt.close(fig)
 
     def _plot_last_images(self, pdf, last_epoch):
         tags = sorted({r["tag"] for r in self.history["images"] if r["epoch"] == last_epoch})

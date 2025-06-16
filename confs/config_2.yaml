@@ -1,4 +1,4 @@
-run_name: tests_3          # "v_0", "v_1", …
+run_name: tests_images_2          # "v_0", "v_1", …
 category: junk
 image_path: data/example_images/2.png
 mask_path: data/example_images/mask3.png
@@ -17,6 +17,6 @@ sigma: 0.
 seed: 42
 
 defaults:
-- flow_model: internal
+- flow_model: internal_2
 - trainer: internal
 - data: internal

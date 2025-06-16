@@ -1,68 +1,14 @@
 from src.flows.flow import Flow
-import matplotlib.pyplot as plt
-import numpy as np
 
-import lpips
-from pathlib import Path
+from typing import Optional
 from torch_ema import ExponentialMovingAverage
-from pytorch_msssim import ssim as _ssim_fn   # pip install pytorch-msssim
+import torch
+from torch import nn
+from torch import Tensor
 
-_lpips_loss_fn = lpips.LPIPS(net='vgg')
+from torchdiffeq import odeint
 
-def _get_psnr(x_pred, x_gt):
-    """
-    Calculate the Peak Signal-to-Noise Ratio (PSNR) between the predicted and ground truth images.
-    """
-    mse = ((x_pred - x_gt) ** 2).mean()
-    psnr = 10 * np.log10(1 / mse)
-    return psnr
-
-def _get_lpips(x_pred, x_gt):
-    """
-    Calculate the Learned Perceptual Image Patch Similarity (LPIPS) between the predicted and ground truth images.
-    """
-    if len(x_pred.shape) == 3:
-        x_pred = x_pred.unsqueeze(0)
-        x_gt = x_gt.unsqueeze(0)
-
-    lpips_score = _lpips_loss_fn(x_pred, x_gt)
-    return lpips_score.item()
-
-
-def _get_ssim(x_pred, x_gt, data_range=1.0):
-    """
-    Calculate the Structural Similarity Index (SSIM) between the predicted and
-    ground-truth images.
-
-    Args
-    ----
-    x_pred, x_gt : torch.Tensor
-        Image tensors shaped  (B, C, H, W) **or** (C, H, W) in the range [0, data_range].
-    data_range   : float
-        Dynamic range of the images. 1.0 if tensors are already in [0,1],
-        255 if they are uint-8 images converted to floats, etc.
-    Returns
-    -------
-    float
-        SSIM value averaged over the whole batch; 1 = perfect match.
-    """
-    # add batch dimension if the caller passed (C, H, W)
-    if x_pred.ndim == 3:
-        x_pred = x_pred.unsqueeze(0)
-        x_gt   = x_gt.unsqueeze(0)
-
-    # safety: clamp into the valid intensity range
-    x_pred = x_pred.clamp(0, data_range)
-    x_gt   = x_gt.clamp(0, data_range)
-
-    score = _ssim_fn(
-        x_pred,
-        x_gt,
-        data_range=data_range,
-        size_average=True
-    )
-
-    return score.item()
+from typing import Any, Dict, Callable
 
 
 class InpaintingFlow(Flow):
@@ -78,6 +24,40 @@ class InpaintingFlow(Flow):
         self.ema = ExponentialMovingAverage(self.parameters(), decay=ema_decay)
         self.ema.update(self.parameters())                       # Initialize EMA
 
+    def tweaked_velocity(self, x_1, t, x_t, y):
+        estimated_velocity = super().estimated_velocity(t, x_t, y=y)
+        if t.dim() == 0:
+            t = t.unsqueeze(0).expand(x_t.shape[0])
+        true_velocity = self.path.convert_parameterization(t, x_t, x_1, source_parameterization="x1", target_parameterization="velocity")
+        
+        M = y # Inpainting Mask
+
+        estimated_velocity = estimated_velocity * M + (1 - M) * true_velocity
+        return estimated_velocity
+
+    def sample_cheat(self, x_0: Tensor, x_1, y: Optional[Tensor] = None, **solver_cfg: Any) -> Tensor:
+        
+        # Override of the sample method, to use the exact solution for the exterior of the inpainting mask.
+        
+
+        t_span = torch.tensor([0., 1.], device=x_0.device)
+        solver_cfg = {'method':'dopri5'} | self._merge_config(solver_cfg)
+
+        # Pass x_1
+        velocity_field = lambda t, x: self.tweaked_velocity(x_1, t, x, y=y)
+
+        # Solve the ODE
+        with torch.no_grad():
+            trajectory = odeint(
+                velocity_field,
+                x_0,
+                t_span,
+                **solver_cfg
+            )
+        
+        return trajectory[-1, ...] # Trajectory is of shape (2, BS, ...)
+
+
     def training_step(self, batch, batch_idx):
         loss = super().training_step(batch, batch_idx)
         self.ema.update(self.parameters())
@@ -88,10 +68,10 @@ class InpaintingFlow(Flow):
         y = rest[0] if rest else None
 
         # run the raw model
-        x_pred = self(x0, y=y)
+        x_pred = self.sample_cheat(x0, x1, y=y)
         # run the EMA model
         with self.ema.average_parameters():
-            x_pred_ema = self(x0, y=y)
+            x_pred_ema = self.sample_cheat(x0, x1, y=y)
 
         # optional conversion back to natural image range
         if self.to_natural:

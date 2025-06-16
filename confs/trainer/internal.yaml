@@ -1,18 +1,23 @@
 defaults:
   - base
 
-max_epochs: 30
+max_epochs: 15
+limit_train_batches: 780
 precision: bf16-mixed
-accumulate_grad_batches: 8
+accumulate_grad_batches: 4
 
 gradient_clip_val: 1.0
 deterministic: true
 
 accelerator: gpu
-devices: 3
+devices: 1
 strategy: ddp
 
+check_val_every_n_epoch: 1
 
+profiler: "simple"     # ou "advanced"
+
+    
 callbacks:
   - _target_: pytorch_lightning.callbacks.TQDMProgressBar
     refresh_rate: 10
@@ -32,8 +37,9 @@ callbacks:
 logger:
   - _target_: pytorch_lightning.loggers.WandbLogger
     project: InternalDiffusionProject_${run_name}
-    name: "OTScheduler_sigma_v"
+    name: ${sanitize:${image_path}}_${category}_${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_dir: "wandb/"
     log_model: true
+    
 
   

@@ -1,0 +1,23 @@
+defaults:
+- internal
+
+_target_: src.cond_int_flow.flow.InpaintingFlow
+
+
+# The model used to parameterize the flow
+model:
+  _target_: src.cond_int_flow.model.Model
+  n_channels: 32
+  output_dim: 3
+  in_dim: 4 # 2*3 + 1
+  skip: false
+
+# The configuration for the flow
+cfg:
+  _target_: src.flows.types.FlowConfig
+  predicts: velocity
+  guidance: CFG
+  guidance_scale: 4.0
+  guided_prob: 0.8
+
+pass_y: true # Always pass the mask to the model

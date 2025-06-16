@@ -404,7 +404,8 @@ class Flow(LightningModule):
 
     def _merge_config(self, cfg: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         """Merge the provided config with the flow's solver config."""
-        merged_cfg = OmegaConf.to_container(self.solver_cfg) | cfg | kwargs
+        solver_cfg = self.solver_cfg if isinstance(self.solver_cfg, dict) else OmegaConf.to_container(self.solver_cfg)
+        merged_cfg = solver_cfg | cfg | kwargs
         return merged_cfg
 
 

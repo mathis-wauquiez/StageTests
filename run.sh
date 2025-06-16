@@ -1,26 +1,31 @@
 #!/bin/sh
-#SBATCH --job-name=int-flow
+#SBATCH --job-name=line-int-flow
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --nodes=1
 #SBATCH --partition=A100
-#SBATCH --gpus=3
-#SBATCH --cpus-per-gpu=12
+#SBATCH --gpus=1
+#SBATCH --cpus-per-gpu=16
 #SBATCH --mem=64GB
 #SBATCH --time=12:00:00
-#SBATCH --mail-type=ALL
+#SBATCH --mail-type=FAIL
 #SBATCH --mail-user=mathis.wauquiez@eleves.enpc.fr
 
 export HYDRA_FULL_ERROR=1
 
-srun python train_model.py\
-    image_path=data/example_images/grass_big.jpg \
-    mask_path=data/example_images/grass_mask.png \
-    flow_model.model.n_channels=128 \
-    data.train_loader.dataset.sigma=0.05
+# # ---- Small model with multiple images ----
+# srun python train_model.py \
+#     --config-name=config_2 \
+#     data=multiple_images \
+#     image_path=data/DaVinciDataset/ \
+#     mask_path=data/example_images/mask3.png \
+#     flow_model.model.n_channels=32 \
+#     category=small_model
 
-srun python train_model.py\
-    image_path=data/example_images/grass_big.jpg \
-    mask_path=data/example_images/grass_mask.png \
+# ---- Big model with multiple images ----
+srun python train_model.py \
+    --config-name=config_2 \
+    data/example_images/bricks.jpg \
+    mask_path=data/example_images/mask.png \
     flow_model.model.n_channels=128 \
-    data.train_loader.dataset.sigma=0.85
+    category=big_model
