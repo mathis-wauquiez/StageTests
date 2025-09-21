@@ -1,0 +1,11 @@
+defaults:
+  - base # this imports the base.yaml config
+
+
+model:
+  _target_: src.experiments.models.models.TimeConditionedMLP
+  x_dim: 2
+  output_dim: 2
+  num_fourier_bands: 4
+  hidden_dim: 64
+  n_layers: 4

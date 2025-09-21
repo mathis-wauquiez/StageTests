@@ -1,0 +1,22 @@
+defaults:
+- base
+
+
+# The model used to parameterize the flow
+model:
+  _target_: src.experiments.models.models.TimeAndLabelConditionedMLP
+  x_dim: 784
+  output_dim: 784
+  num_classes: 10
+  y_emb_dim: 64
+  num_fourier_bands: 6
+  hidden_dim: 784
+  n_layers: 5
+
+# The configuration for the flow
+cfg:
+  _target_: src.flows.types.FlowConfig
+  predicts: "x_1" # or "x_0", "score", "velocity", what the model predicts
+  guidance: "CFG"  # or "classifier", "CFG"
+  guidance_scale: 3.0
+  guided_prob: 0.8

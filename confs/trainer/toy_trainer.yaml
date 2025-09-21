@@ -1,0 +1,10 @@
+defaults:
+  - base
+
+max_epochs: 3
+
+callbacks:
+  - _target_: pytorch_lightning.callbacks.TQDMProgressBar
+    refresh_rate: 100
+    leave: true
+

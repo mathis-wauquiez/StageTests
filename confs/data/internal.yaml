@@ -1,0 +1,26 @@
+train_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 64
+  num_workers: 16
+  pin_memory: true
+  persistent_workers: true      # garde les workers vivants
+  prefetch_factor: 4            # lit 4 batches d’avance
+  dataset:
+    _target_: src.internal_flow.data.TrainOverride
+    image_path: ${image_path}
+    mask_path: ${mask_path}
+    seed: ${seed}
+    sigma: ${sigma}
+
+test_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 1
+  num_workers: 0
+  pin_memory: true
+
+  dataset:
+    _target_: src.internal_flow.data.TestOverride
+    image_path: ${image_path}
+    mask_path: ${mask_path}
+    seed: ${seed}
+    sigma: ${sigma} # % of noise inside the image, in terms of variance
