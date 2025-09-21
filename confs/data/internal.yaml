@@ -1,7 +1,7 @@
 train_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: 64
-  num_workers: 28
+  num_workers: 16
   pin_memory: true
   persistent_workers: true      # garde les workers vivants
   prefetch_factor: 4            # lit 4 batches d’avance

@@ -17,3 +17,5 @@ myenv.yaml
 *.pyc
 *.pyc
 /src/flows/__pycache__
+/outputs_aha
+/outputssan

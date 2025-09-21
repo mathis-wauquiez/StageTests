@@ -80,7 +80,7 @@ class Model(nn.Module):
 
         self.time_encoder2 = nn.Sequential(nn.Linear(self.time_dim, self.time_dim), nn.GELU(), nn.Linear(self.time_dim, self.time_dim))
 
-        self.conv_features = UNet(n_levels=3, n_channels=self.d)
+        self.conv_features = UNet(n_levels=5, n_channels=self.d)
 
         self.post_features = nn.Sequential(
             nn.Conv2d(self.d, self.output_dim, 3, padding=1)

@@ -4,7 +4,7 @@
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --nodes=1
 #SBATCH --partition=A100
-#SBATCH --gpus=1
+#SBATCH --gpus=2
 #SBATCH --cpus-per-gpu=16
 #SBATCH --mem=64GB
 #SBATCH --time=12:00:00
@@ -25,7 +25,7 @@ export HYDRA_FULL_ERROR=1
 # ---- Big model with multiple images ----
 srun python train_model.py \
     --config-name=config_2 \
-    data/example_images/bricks.jpg \
+    image_path=data/example_images/horizontal_gradient.png \
     mask_path=data/example_images/mask.png \
     flow_model.model.n_channels=128 \
     category=big_model

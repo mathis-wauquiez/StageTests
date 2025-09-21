@@ -38,13 +38,27 @@ MASK_PATH="${MASK_PATHS[$IDX]}"
 
 export HYDRA_FULL_ERROR=1
 
-# srun python train_model.py \
-#     --config-name=config_2 \
-#     image_path="$IMAGE_PATH" \
-#     mask_path="$MASK_PATH" \
-#     flow_model.model.n_channels=32 \
-#     flow_model.cfg.predicts="x_1" \
-#     category=small_model_x1
+srun python train_model.py \
+    --config-name=config_2 \
+    image_path="$IMAGE_PATH" \
+    mask_path="$MASK_PATH" \
+    flow_model.model.n_channels=8 \
+    category=tiny_model
+
+srun python train_model.py \
+    --config-name=config_2 \
+    image_path="$IMAGE_PATH" \
+    mask_path="$MASK_PATH" \
+    flow_model.model.n_channels=32 \
+    category=small_model
+
+srun python train_model.py \
+    --config-name=config_2 \
+    image_path="$IMAGE_PATH" \
+    mask_path="$MASK_PATH" \
+    flow_model.model.n_channels=32 \
+    flow_model.cfg.predicts="x_1" \
+    category=small_model_x1
 
 srun python train_model.py \
     --config-name=config_2 \
@@ -52,3 +66,11 @@ srun python train_model.py \
     mask_path="$MASK_PATH" \
     flow_model.model.n_channels=128 \
     category=big_model
+
+srun python train_model.py \
+    --config-name=config_2 \
+    image_path="$IMAGE_PATH" \
+    mask_path="$MASK_PATH" \
+    flow_model.model.n_channels=128 \
+    flow_model.cfg.predicts="x_1" \
+    category=big_model_x1

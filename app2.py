@@ -12,8 +12,8 @@ Gradio demo for in-painting flow models.
 * Editable `solver_cfg` YAML → forwarded as **kwargs to `model.sample`.
 * Reload-sample & Generate buttons.
 """
-
 from __future__ import annotations
+print('opened')
 
 import argparse
 from pathlib import Path

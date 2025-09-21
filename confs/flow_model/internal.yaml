@@ -19,32 +19,5 @@ cfg:
   predicts: velocity # or "x_0", "score", "velocity", what the model predicts
   guidance: none
 
-solver_cfg: # configuration for torchdiffeq.odeint
-            # see https://github.com/rtqichen/torchdiffeq
-  
-  method: "euler" # midpoint, euler, ...
-  # atol: 1e-5
-  # rtol: 1e-5
-  options:
-    step_size: 0.002
-
-
-path:
-  _target_: src.flows.path.AffinePath 
-  scheduler:
-    _target_: src.flows.schedulers.OTScheduler  # or CosineScheduler
-  t_law:
-    _target_: src.flows.snr_sampler.LogitNormal
-    loc: 0.0
-    scale: 1.0
-
-  tol: 0.000000000000001
 
 pass_y: true
-
-optimizer_cfg:
-  _target_: torch.optim.AdamW
-  _partial_: true     # ← important!
-  lr: 0.0001
-  weight_decay: 0.0001
-  betas: [0.9, 0.999]
